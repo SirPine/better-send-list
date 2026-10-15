@@ -27,7 +27,7 @@
     --danger: #DC2626;
     --disabled-bg: #F1F5F9;     /* color/disabled-bg */
     --disabled-text: #94A3B8;   /* color/disabled-text */
-    --panel-from: #EEF0F8;      /* soft pastel gradient behind sign-in and the side panel */
+    --panel-from: #EEF0F8;      /* soft pastel gradient behind the sign-in page */
     --panel-to: #DDE2F0;
     --viewer-bg: #E2E8F0;       /* behind PDF pages, so white pages stand out */
     --radius: 16px;
@@ -60,8 +60,19 @@
   .brand-name { font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
   .brand-sub { font-size: 13px; color: var(--muted); }
   .header-links { display: flex; gap: 28px; }
-  .header-links a { color: var(--muted); text-decoration: none; font-size: 14px; }
-  .header-links a:hover { color: var(--ink); }
+  .header-links a, .header-links button { color: var(--muted); text-decoration: none; font-size: 14px; background: none; border: 0; padding: 0; cursor: pointer; }
+  .header-links a:hover, .header-links button:hover { color: var(--ink); }
+
+  /* ---------- Help dialog ---------- */
+  .dialog { border: 0; border-radius: var(--radius); padding: 0; width: min(400px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2); }
+  .dialog::backdrop { background: rgba(15, 23, 42, 0.4); }
+  .dialog[open] { animation: dialog-in .18s ease-out; }
+  @keyframes dialog-in { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .dialog[open] { animation: none; } }
+  .dialog-body { padding: 32px 28px 28px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .dialog-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0; }
+  .dialog-text { color: var(--muted); margin: 0 0 8px; }
+  .dialog-text strong { color: var(--ink); font-weight: 600; white-space: nowrap; }
 
   /* ---------- Intro ---------- */
   main.container { flex: 1; width: 100%; display: flex; flex-direction: column; padding-top: 24px; padding-bottom: 24px; }
@@ -74,13 +85,13 @@
   .signin-view .lead { margin: 0 auto 24px; }
   .signin-card { text-align: left; border-color: transparent; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); }
   body.is-signin { background: linear-gradient(160deg, var(--panel-from), var(--panel-to)); }
-  .build-side { background: linear-gradient(160deg, var(--panel-from), var(--panel-to)); border-radius: var(--radius); padding: 28px; }
-  @media (max-width: 600px) { .build-side { padding: 20px; } }
-  .build-side .card { border-color: transparent; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08); }
-  .build-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px; }
-  .build-head h1 { margin: 0; font-size: 28px; }
-  .signed-in { font-size: 14px; color: var(--muted); }
+  .build-side { display: flex; flex-direction: column; }
+  /* Account row, just under the upload card */
+  .signed-in { padding: 0 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
+  .build-side .card { margin-bottom: 16px; }
   .signed-in strong { color: var(--ink); font-weight: 600; }
+  .signed-in .link { text-decoration: none; }
+  .signed-in .link:hover { text-decoration: underline; }
 
   /* On wide screens the page fits the window; only the preview scrolls. */
   @media (min-width: 900px) {
@@ -186,8 +197,7 @@
       </div>
     </div>
     <nav class="header-links" aria-label="Help">
-      <a href="#how">How it works</a>
-      <a href="#help">Help</a>
+      <button type="button" id="help-btn" aria-haspopup="dialog">Help</button>
     </nav>
   </div>
 </header>
@@ -223,14 +233,10 @@
   <!-- View 2: upload and preview -->
   <div id="build-view" hidden>
     <div class="build-side">
-      <div class="build-head">
-        <h1>Upload your send list</h1>
-        <div class="signed-in">Signed in as <strong id="signed-in-user"></strong> · <button class="link" id="signout-btn" type="button">Sign out</button></div>
-      </div>
       <section class="card" aria-labelledby="pdf-title">
         <div>
-          <h2 class="card-title" id="pdf-title">Send list PDF</h2>
-          <p class="card-sub">Upload the send list exactly as exported from WorkFlows.</p>
+          <h2 class="card-title" id="pdf-title">Upload send list PDF here</h2>
+          <p class="card-sub">This program will automatically insert clerk notes and barcodes into the send list.</p>
         </div>
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload send list PDF">
           <div class="drop-icon">
@@ -251,12 +257,16 @@
         </div>
         <p class="error-msg" id="generate-error" role="alert" hidden><span id="generate-error-text"></span> <button class="link" id="retry-btn" type="button">Try again</button></p>
       </section>
+      <div class="signed-in">
+        <span>Signed in as <strong id="signed-in-user"></strong></span>
+        <button class="link" id="signout-btn" type="button">Sign out</button>
+      </div>
     </div>
 
     <!-- Preview -->
     <section class="card preview-card" aria-labelledby="preview-title">
       <div class="card-head preview-head">
-        <h2 class="card-title" id="preview-title">Send list preview</h2>
+        <h2 class="card-title" id="preview-title">Preview</h2>
         <div class="preview-actions">
           <button class="btn btn-outline" id="print-btn" type="button" disabled>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
@@ -320,6 +330,14 @@
     </section>
   </div>
 </main>
+
+<dialog class="dialog" id="help-dialog" aria-labelledby="help-title">
+  <form method="dialog" class="dialog-body">
+    <h2 class="dialog-title" id="help-title">Need help?</h2>
+    <p class="dialog-text">For any help with the website, contact <strong>Derek Kiefer</strong>.</p>
+    <button class="btn btn-solid btn-block" type="submit" autofocus>Close</button>
+  </form>
+</dialog>
 
 <script>
 /* =====================================================================
@@ -660,6 +678,12 @@ downloadBtn.addEventListener("click", () => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
+
+/* ---------- Help ---------- */
+const helpDialog = $("help-dialog");
+$("help-btn").addEventListener("click", () => helpDialog.showModal());
+// Clicking the dimmed backdrop (outside the dialog box) closes it.
+helpDialog.addEventListener("click", (e) => { if (e.target === helpDialog) helpDialog.close(); });
 
 /* ---------- Init ---------- */
 updateNavButtons(1);
