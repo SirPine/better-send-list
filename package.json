@@ -1,0 +1,29 @@
+{
+  "name": "better-send-list",
+  "version": "1.0.0",
+  "description": "Improve the send list at The Honorable Shirley Chisholm Library.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SirPine/better-send-list.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/SirPine/better-send-list/issues"
+  },
+  "homepage": "https://github.com/SirPine/better-send-list#readme",
+  "dependencies": {
+    "express": "^5.3.0",
+    "multer": "^2.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

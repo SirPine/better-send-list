@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Send List Builder · Honorable Shirley Chisholm Library</title>
+<title>Send List Builder · Chisholm Library</title>
+<!-- Tab icon: same book mark as the header logo -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%234F46E5'/%3E%3Cg transform='translate(8 8)' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 19.5A2.5 2.5 0 0 1 6.5 17H20'/%3E%3Cpath d='M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'/%3E%3C/g%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -25,6 +27,9 @@
     --danger: #DC2626;
     --disabled-bg: #F1F5F9;     /* color/disabled-bg */
     --disabled-text: #94A3B8;   /* color/disabled-text */
+    --panel-from: #EEF0F8;      /* soft pastel gradient behind sign-in and the side panel */
+    --panel-to: #DDE2F0;
+    --viewer-bg: #E2E8F0;       /* behind PDF pages, so white pages stand out */
     --radius: 16px;
     --shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   }
@@ -38,6 +43,10 @@
     font-size: 15px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
   }
   button, input, select { font: inherit; color: inherit; }
   .container { max-width: 1440px; margin: 0 auto; padding: 0 80px; }
@@ -53,35 +62,48 @@
   .header-links { display: flex; gap: 28px; }
   .header-links a { color: var(--muted); text-decoration: none; font-size: 14px; }
   .header-links a:hover { color: var(--ink); }
-  .site-footer { background: var(--surface); border-top: 1px solid var(--border); margin-top: 72px; }
-  .site-footer .container { display: flex; justify-content: space-between; gap: 12px; padding-top: 24px; padding-bottom: 24px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
-  .site-footer strong { font-weight: 500; }
 
   /* ---------- Intro ---------- */
-  main { padding-top: 64px; }
-  .pill { display: inline-block; background: var(--accent-soft); color: var(--accent); font-weight: 600; font-size: 13px; padding: 5px 12px; border-radius: 999px; }
-  h1 { font-size: 44px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 700; margin: 16px 0; }
-  .lead { font-size: 18px; color: var(--muted); max-width: 780px; margin: 0 0 32px; }
-  @media (max-width: 900px) { h1 { font-size: 34px; } }
+  main.container { flex: 1; width: 100%; display: flex; flex-direction: column; padding-top: 24px; padding-bottom: 24px; }
+  h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 700; margin: 0 0 10px; }
+  .lead { font-size: 16px; color: var(--muted); max-width: 780px; margin: 0 0 24px; }
+  @media (max-width: 900px) { h1 { font-size: 30px; } }
 
-  /* ---------- Stepper ---------- */
-  .steps { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; list-style: none; padding: 0; }
-  .step { display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 8px; border-radius: 999px; border: 1.5px solid transparent; font-weight: 500; color: var(--muted); }
-  .step-num { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface); border: 1.5px solid var(--border); color: var(--muted); }
-  .step.active { border-color: var(--ink); background: var(--surface); color: var(--ink); font-weight: 600; }
-  .step.active .step-num { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .step.done { color: var(--ink); font-weight: 600; }
-  .step.done .step-num { background: var(--success); border-color: var(--success); color: #fff; }
-  .step-line { width: 40px; height: 2px; background: var(--border); }
-  @media (max-width: 700px) { .step-line { display: none; } }
+  /* ---------- Views ---------- */
+  .signin-view { max-width: 440px; width: 100%; margin: auto; text-align: center; }
+  .signin-view .lead { margin: 0 auto 24px; }
+  .signin-card { text-align: left; border-color: transparent; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); }
+  body.is-signin { background: linear-gradient(160deg, var(--panel-from), var(--panel-to)); }
+  .build-side { background: linear-gradient(160deg, var(--panel-from), var(--panel-to)); border-radius: var(--radius); padding: 28px; }
+  @media (max-width: 600px) { .build-side { padding: 20px; } }
+  .build-side .card { border-color: transparent; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08); }
+  .build-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 20px; }
+  .build-head h1 { margin: 0; font-size: 28px; }
+  .signed-in { font-size: 14px; color: var(--muted); }
+  .signed-in strong { color: var(--ink); font-weight: 600; }
+
+  /* On wide screens the page fits the window; only the preview scrolls. */
+  @media (min-width: 900px) {
+    body { height: 100vh; height: 100dvh; }
+    main.container { min-height: 0; overflow: auto; }
+    #build-view { flex: 1; min-height: 0; display: grid; grid-template-columns: 380px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 24px; }
+    .build-side { min-height: 0; overflow: auto; }
+    .preview-card { min-height: 0; }
+    .preview-card .viewer { flex: 1; height: auto; max-height: none; min-height: 0; }
+  }
+  @media (max-height: 760px) {
+    main.container { padding-top: 12px; padding-bottom: 12px; }
+  }
+  @media (max-height: 680px) {
+    .signin-view .lead { margin-bottom: 16px; }
+    .signin-card { padding: 20px 24px; gap: 12px; }
+    .signin-card .field input { padding: 10px 14px; }
+  }
 
   /* ---------- Cards ---------- */
-  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; display: flex; flex-direction: column; gap: 20px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; display: flex; flex-direction: column; gap: 16px; }
   @media (max-width: 600px) { .card { padding: 20px; } }
   .card-head { display: flex; align-items: center; gap: 14px; }
-  .badge { width: 32px; height: 32px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 600; display: grid; place-items: center; flex-shrink: 0; }
   .card-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0; }
   .card-sub { font-size: 15px; color: var(--muted); margin: 2px 0 0; }
 
@@ -92,10 +114,9 @@
   .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .note { display: flex; gap: 10px; align-items: flex-start; background: var(--paper); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--muted); }
   .note svg { flex-shrink: 0; margin-top: 1px; }
-  .row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
   .status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
-  .status.ok { color: var(--success); }
   .status.err { color: var(--danger); }
+  .status:empty { display: none; }
   .status.pending { color: var(--muted); font-weight: 500; }
 
   /* ---------- Buttons ---------- */
@@ -105,15 +126,16 @@
   .btn-outline:hover:not(:disabled) { background: var(--accent-faint); border-width: 2px; padding: 10.5px 19.5px 10.5px 17.5px; }
   .btn-solid { background: var(--ink); border-color: var(--ink); color: #fff; }
   .btn-solid:hover:not(:disabled) { background: var(--ink-dark); border-color: var(--ink-dark); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18); }
-  .btn-accent { background: var(--accent); color: #fff; font-size: 16px; padding: 18px 36px; border-radius: 12px; }
+  .btn-block { width: 100%; padding: 13px 20px; }
+  .btn-accent { background: var(--accent); color: #fff; font-size: 16px; padding: 14px 32px; border-radius: 12px; }
   .btn-accent:hover:not(:disabled) { filter: brightness(0.92); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
   .btn:disabled { background: var(--disabled-bg); border-color: var(--disabled-bg); color: var(--disabled-text); cursor: not-allowed; box-shadow: none; filter: none; }
 
   /* ---------- Upload ---------- */
-  .dropzone { border: 1.5px dashed var(--border); border-radius: 12px; background: var(--paper); padding: 40px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
-  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--accent-faint); }
+  .dropzone { border: 1.5px dashed #C7D2FE; border-radius: 12px; background: var(--accent-faint); padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--accent-soft); }
   .dropzone:focus-visible { outline: 3px solid var(--accent-soft); }
-  .drop-icon { width: 56px; height: 56px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+  .drop-icon { width: 48px; height: 48px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
   .drop-title { font-size: 17px; font-weight: 600; }
   .drop-meta { font-size: 15px; color: var(--muted); }
   .link { color: var(--accent); font-weight: 600; text-decoration: underline; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -124,13 +146,11 @@
   .error-msg { color: var(--danger); font-size: 14px; font-weight: 500; margin: 0; }
   [hidden] { display: none !important; }
 
-  .generate { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 32px 0; }
-  .generate p { margin: 0; font-size: 14px; color: var(--muted); }
 
   /* ---------- Preview ---------- */
   .preview-head { justify-content: space-between; flex-wrap: wrap; gap: 16px; }
   .preview-actions { display: flex; gap: 12px; }
-  .viewer { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--paper); display: flex; flex-direction: column; height: 980px; max-height: 85vh; }
+  .viewer { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--viewer-bg); display: flex; flex-direction: column; height: 980px; max-height: 85vh; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
   .tool-group { display: flex; align-items: center; gap: 8px; transition: opacity .15s; }
   .toolbar.disabled .tool-group { opacity: 0.4; pointer-events: none; }
@@ -146,6 +166,9 @@
   .viewport { flex: 1; overflow: auto; position: relative; }
   .pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 32px; min-width: fit-content; }
   .pages canvas { background: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); display: block; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
   .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-weight: 500; font-size: 16px; text-align: center; padding: 16px; }
 </style>
 </head>
@@ -158,7 +181,7 @@
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       </div>
       <div>
-        <div class="brand-name">Honorable Shirley Chisholm Library</div>
+        <div class="brand-name">Built For The Chisholm Library</div>
         <div class="brand-sub">Send List Builder</div>
       </div>
     </div>
@@ -170,27 +193,15 @@
 </header>
 
 <main class="container">
-  <span class="pill">Staff tool</span>
-  <h1>Build a better send list</h1>
-  <p class="lead">Sign in with your WorkFlows account and upload today’s send list PDF. Each item ID is looked up in WorkFlows and the list comes back with titles, call numbers and shelving locations, grouped by shelf so it is faster to pull.</p>
+  <!-- View 1: WorkFlows sign-in -->
+  <section class="signin-view" id="signin-view" hidden>
+    <h1>Build a better send list</h1>
+    <p class="lead">Upload today’s send list and get it back with titles, call numbers and locations, grouped by shelf.</p>
 
-  <ol class="steps" aria-label="Progress">
-    <li class="step active" id="step-1"><span class="step-num">1</span>Connect WorkFlows</li>
-    <li class="step-line" aria-hidden="true"></li>
-    <li class="step" id="step-2"><span class="step-num">2</span>Upload send list PDF</li>
-    <li class="step-line" aria-hidden="true"></li>
-    <li class="step" id="step-3"><span class="step-num">3</span>Preview send list</li>
-  </ol>
-
-  <div class="grid-2">
-    <!-- Card 1: WorkFlows -->
-    <section class="card" aria-labelledby="wf-title">
-      <div class="card-head">
-        <div class="badge">1</div>
-        <div>
-          <h2 class="card-title" id="wf-title">WorkFlows account</h2>
-          <p class="card-sub">Used only to look up item records for this list.</p>
-        </div>
+    <form class="card signin-card" id="signin-form" aria-labelledby="wf-title" novalidate>
+      <div>
+        <h2 class="card-title" id="wf-title">Sign in to WorkFlows</h2>
+        <p class="card-sub">Used only to look up item records for this list.</p>
       </div>
       <div class="field">
         <label for="wf-user">User ID</label>
@@ -202,129 +213,121 @@
       </div>
       <div class="note">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Credentials are sent over an encrypted connection and are not saved. They’re cleared when you close this page.</span>
+        <span>Your password is sent securely and never saved.</span>
       </div>
-      <div class="row">
-        <button class="btn btn-outline" id="test-btn" type="button">Test connection</button>
-        <span class="status" id="wf-status" role="status" aria-live="polite"></span>
-      </div>
-    </section>
+      <button class="btn btn-solid btn-block" id="signin-btn" type="submit">Sign in</button>
+      <span class="status" id="wf-status" role="status" aria-live="polite"></span>
+    </form>
+  </section>
 
-    <!-- Card 2: PDF -->
-    <section class="card" aria-labelledby="pdf-title">
-      <div class="card-head">
-        <div class="badge">2</div>
+  <!-- View 2: upload and preview -->
+  <div id="build-view" hidden>
+    <div class="build-side">
+      <div class="build-head">
+        <h1>Upload your send list</h1>
+        <div class="signed-in">Signed in as <strong id="signed-in-user"></strong> · <button class="link" id="signout-btn" type="button">Sign out</button></div>
+      </div>
+      <section class="card" aria-labelledby="pdf-title">
         <div>
           <h2 class="card-title" id="pdf-title">Send list PDF</h2>
           <p class="card-sub">Upload the send list exactly as exported from WorkFlows.</p>
         </div>
-      </div>
-      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload send list PDF">
-        <div class="drop-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload send list PDF">
+          <div class="drop-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="drop-title">Drag and drop your send list PDF here</div>
+          <div class="drop-meta"><span class="link">or browse files</span> · PDF up to 20 MB</div>
+          <input type="file" id="file-input" accept="application/pdf,.pdf" hidden />
         </div>
-        <div class="drop-title">Drag and drop your send list PDF here</div>
-        <div class="drop-meta"><span class="link">or browse files</span> · PDF up to 20 MB</div>
-        <input type="file" id="file-input" accept="application/pdf,.pdf" hidden />
-      </div>
-      <p class="error-msg" id="file-error" role="alert" hidden></p>
-      <div class="file-chip" id="file-chip" hidden>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        <div class="info">
-          <div class="file-name" id="file-name"></div>
-          <div class="file-meta" id="file-meta"></div>
+        <p class="error-msg" id="file-error" role="alert" hidden></p>
+        <div class="file-chip" id="file-chip" hidden>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div class="info">
+            <div class="file-name" id="file-name"></div>
+            <div class="file-meta" id="file-meta"></div>
+          </div>
+          <button class="link" id="remove-file" type="button">Remove</button>
         </div>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <button class="link" id="remove-file" type="button">Remove</button>
+        <p class="error-msg" id="generate-error" role="alert" hidden><span id="generate-error-text"></span> <button class="link" id="retry-btn" type="button">Try again</button></p>
+      </section>
+    </div>
+
+    <!-- Preview -->
+    <section class="card preview-card" aria-labelledby="preview-title">
+      <div class="card-head preview-head">
+        <h2 class="card-title" id="preview-title">Send list preview</h2>
+        <div class="preview-actions">
+          <button class="btn btn-outline" id="print-btn" type="button" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print
+          </button>
+          <button class="btn btn-solid" id="download-btn" type="button" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download
+          </button>
+        </div>
+      </div>
+
+      <div class="viewer">
+        <div class="toolbar disabled" id="toolbar">
+          <div class="tool-group">
+            <button class="icon-btn" id="prev-page" type="button" aria-label="Previous page">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span class="tool-text">Page</span>
+            <input class="page-input" id="page-input" type="text" inputmode="numeric" value="–" aria-label="Current page" />
+            <span class="tool-text" id="page-count">of –</span>
+            <button class="icon-btn" id="next-page" type="button" aria-label="Next page">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+          <div class="tool-group">
+            <button class="icon-btn" id="zoom-out" type="button" aria-label="Zoom out">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <select class="zoom-select" id="zoom-select" aria-label="Zoom level">
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+              <option value="fit" hidden>Fit width</option>
+            </select>
+            <button class="icon-btn" id="zoom-in" type="button" aria-label="Zoom in">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+            <span class="divider" aria-hidden="true"></span>
+            <button class="text-btn" id="fit-width" type="button">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 8 22 12 18 16"/><polyline points="6 8 2 12 6 16"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+              Fit width
+            </button>
+          </div>
+        </div>
+        <div class="viewport" id="viewport">
+          <div class="empty" id="empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--disabled-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span id="empty-text">Upload a send list PDF to preview it here</span>
+          </div>
+          <div class="empty" id="loading" role="status" hidden>
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Generating your send list…</span>
+          </div>
+          <div class="pages" id="pages"></div>
+        </div>
       </div>
     </section>
   </div>
-
-  <div class="generate">
-    <button class="btn btn-accent" id="generate-btn" type="button" disabled>Generate improved send list →</button>
-    <p id="generate-hint">Enter your WorkFlows account and upload a send list PDF to continue.</p>
-  </div>
-
-  <!-- Card 3: Preview -->
-  <section class="card" aria-labelledby="preview-title">
-    <div class="card-head preview-head">
-      <div class="card-head">
-        <div class="badge">3</div>
-        <h2 class="card-title" id="preview-title">Send list preview</h2>
-      </div>
-      <div class="preview-actions">
-        <button class="btn btn-outline" id="print-btn" type="button" disabled>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          Print
-        </button>
-        <button class="btn btn-solid" id="download-btn" type="button" disabled>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download
-        </button>
-      </div>
-    </div>
-
-    <div class="viewer">
-      <div class="toolbar disabled" id="toolbar">
-        <div class="tool-group">
-          <button class="icon-btn" id="prev-page" type="button" aria-label="Previous page">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <span class="tool-text">Page</span>
-          <input class="page-input" id="page-input" type="text" inputmode="numeric" value="–" aria-label="Current page" />
-          <span class="tool-text" id="page-count">of –</span>
-          <button class="icon-btn" id="next-page" type="button" aria-label="Next page">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-        <div class="tool-group">
-          <button class="icon-btn" id="zoom-out" type="button" aria-label="Zoom out">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <select class="zoom-select" id="zoom-select" aria-label="Zoom level">
-            <option value="0.5">50%</option>
-            <option value="0.75">75%</option>
-            <option value="1" selected>100%</option>
-            <option value="1.25">125%</option>
-            <option value="1.5">150%</option>
-            <option value="2">200%</option>
-            <option value="fit" hidden>Fit width</option>
-          </select>
-          <button class="icon-btn" id="zoom-in" type="button" aria-label="Zoom in">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <span class="divider" aria-hidden="true"></span>
-          <button class="text-btn" id="fit-width" type="button">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 8 22 12 18 16"/><polyline points="6 8 2 12 6 16"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
-            Fit width
-          </button>
-        </div>
-      </div>
-      <div class="viewport" id="viewport">
-        <div class="empty" id="empty">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--disabled-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span id="empty-text">Upload a send list PDF to preview it here</span>
-        </div>
-        <div class="pages" id="pages"></div>
-      </div>
-    </div>
-  </section>
 </main>
-
-<footer class="site-footer">
-  <div class="container">
-    <strong>Honorable Shirley Chisholm Library</strong>
-    <span>Send List Builder · Staff tool</span>
-  </div>
-</footer>
 
 <script>
 /* =====================================================================
    BACKEND HOOKS — point these at your server when it's ready.
    ===================================================================== */
 const API = {
-  testConnection: "/api/workflows/test",   // POST { userId, password } -> 200 OK if valid
-  generate:       "/api/send-list",        // POST multipart: userId, password, file -> returns improved PDF
+  session:  "/api/session",    // GET -> { userId } if signed in; POST { userId, password } signs in; DELETE signs out
+  sendList: "/api/send-list",  // POST multipart: file, pageCount -> improved PDF; GET the saved one; DELETE removes it
 };
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -333,22 +336,24 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 /* ---------- Elements ---------- */
 const $ = (id) => document.getElementById(id);
-const userEl = $("wf-user"), passEl = $("wf-pass"), statusEl = $("wf-status");
+const signinView = $("signin-view"), buildView = $("build-view");
+const userEl = $("wf-user"), passEl = $("wf-pass"), statusEl = $("wf-status"), signinBtn = $("signin-btn");
 const dropzone = $("dropzone"), fileInput = $("file-input"), fileError = $("file-error");
 const fileChip = $("file-chip"), fileNameEl = $("file-name"), fileMetaEl = $("file-meta");
-const generateBtn = $("generate-btn"), generateHint = $("generate-hint");
+const generateError = $("generate-error"), generateErrorText = $("generate-error-text"), loadingEl = $("loading");
 const printBtn = $("print-btn"), downloadBtn = $("download-btn");
 const toolbar = $("toolbar"), viewport = $("viewport"), pagesEl = $("pages"), emptyEl = $("empty"), emptyText = $("empty-text");
 const pageInput = $("page-input"), pageCount = $("page-count"), zoomSelect = $("zoom-select");
 
 /* ---------- State ---------- */
-let uploadedFile = null;     // the send list the user uploaded
+let uploadedFile = null;     // the send list the user uploaded (null after a restore from the session)
+let uploadedPages = 0;
 let previewBlob = null;      // the PDF currently shown in the preview
-let previewName = "send-list.pdf";
 let pdfDoc = null;
 let scale = 1;               // 1 = 100%
 let fitMode = false;
 let renderToken = 0;
+let generateToken = 0;       // bumped when a new generate starts or the file is removed
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /* ---------- Helpers ---------- */
@@ -360,44 +365,54 @@ function setStatus(text, kind) {
   statusEl.textContent = text;
 }
 
-function updateSteps() {
-  const s1 = $("step-1"), s2 = $("step-2"), s3 = $("step-3");
-  [s1, s2, s3].forEach(s => s.classList.remove("active", "done"));
-  const step1Done = credsFilled();
-  const step2Done = !!uploadedFile;
-  s1.classList.add(step1Done ? "done" : "active");
-  if (step1Done) s2.classList.add(step2Done ? "done" : "active");
-  if (step1Done && step2Done) s3.classList.add("active");
-  s1.querySelector(".step-num").textContent = step1Done ? "✓" : "1";
-  s2.querySelector(".step-num").textContent = step2Done ? "✓" : "2";
-}
-
-function updateGenerate() {
-  const ready = credsFilled() && !!uploadedFile;
-  generateBtn.disabled = !ready;
-  generateHint.textContent = ready
-    ? "Usually takes under a minute for 150 items."
-    : "Enter your WorkFlows account and upload a send list PDF to continue.";
-  updateSteps();
-}
-
 /* ---------- WorkFlows ---------- */
-[userEl, passEl].forEach(el => el.addEventListener("input", () => { setStatus(""); updateGenerate(); }));
+function showView(userId) {
+  const signedIn = !!userId;
+  document.body.classList.toggle("is-signin", !signedIn);
+  signinView.hidden = signedIn;
+  buildView.hidden = !signedIn;
+  $("signed-in-user").textContent = signedIn ? userId : "";
+}
 
-$("test-btn").addEventListener("click", async () => {
-  if (!credsFilled()) { setStatus("Enter your user ID and password first.", "err"); return; }
-  setStatus("Checking…", "pending");
+// Called when the server says the session is gone (expired, or the server restarted).
+function sessionExpired() {
+  clearFile();
+  showView(null);
+  setStatus("Your session expired. Please sign in again.", "err");
+  passEl.focus();
+}
+
+[userEl, passEl].forEach(el => el.addEventListener("input", () => setStatus("")));
+
+$("signin-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!credsFilled()) { setStatus("Enter your user ID and password.", "err"); return; }
+  setStatus("Signing in…", "pending");
+  signinBtn.disabled = true;
   try {
-    const res = await fetch(API.testConnection, {
+    const res = await fetch(API.session, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: userEl.value.trim(), password: passEl.value }),
     });
     if (!res.ok) throw new Error(res.status === 401 ? "Invalid user ID or password." : "Couldn’t reach WorkFlows.");
-    setStatus("✓ Connected to WorkFlows", "ok");
+    const { userId } = await res.json();
+    passEl.value = "";   // the server keeps the session; the password isn't needed again
+    setStatus("");
+    showView(userId);
   } catch (e) {
     setStatus(e.message.startsWith("Invalid") || e.message.startsWith("Couldn’t") ? e.message : "Couldn’t reach the server.", "err");
+  } finally {
+    signinBtn.disabled = false;
   }
+});
+
+$("signout-btn").addEventListener("click", async () => {
+  try { await fetch(API.session, { method: "DELETE" }); } catch { /* signed out locally either way */ }
+  passEl.value = "";
+  clearFile();
+  showView(null);
+  passEl.focus();
 });
 
 /* ---------- Upload & validation ---------- */
@@ -426,13 +441,16 @@ async function handleFile(file) {
     return showFileError("This PDF couldn’t be opened. It may be damaged or password-protected.");
   }
   uploadedFile = file;
-  fileNameEl.textContent = file.name;
-  fileMetaEl.textContent = `${formatSize(file.size)} · ${doc.numPages} page${doc.numPages === 1 ? "" : "s"}`;
+  uploadedPages = doc.numPages;
+  showFileChip(file.name, file.size, doc.numPages);
+  generate();
+}
+
+function showFileChip(name, size, pages) {
+  fileNameEl.textContent = name;
+  fileMetaEl.textContent = formatSize(size) + (pages ? ` · ${pages} page${pages === 1 ? "" : "s"}` : "");
   fileChip.hidden = false;
   dropzone.hidden = true;
-  updateGenerate();
-  // Show the uploaded PDF right away; it is replaced by the improved list after "Generate".
-  loadPreview(file, file.name, doc);
 }
 
 function clearFile() {
@@ -441,8 +459,10 @@ function clearFile() {
   fileChip.hidden = true;
   dropzone.hidden = false;
   fileError.hidden = true;
+  generateError.hidden = true;
+  generateToken++;
+  setLoading(false);
   clearPreview();
-  updateGenerate();
 }
 
 dropzone.addEventListener("click", () => fileInput.click());
@@ -451,41 +471,53 @@ fileInput.addEventListener("change", () => handleFile(fileInput.files[0]));
 ["dragenter", "dragover"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); }));
 ["dragleave", "drop"].forEach(ev => dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); }));
 dropzone.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
-$("remove-file").addEventListener("click", clearFile);
-
-/* ---------- Generate (calls your backend) ---------- */
-generateBtn.addEventListener("click", async () => {
-  const original = generateBtn.textContent;
-  generateBtn.disabled = true;
-  generateBtn.textContent = "Generating…";
-  try {
-    const form = new FormData();
-    form.append("userId", userEl.value.trim());
-    form.append("password", passEl.value);
-    form.append("file", uploadedFile);
-    const res = await fetch(API.generate, { method: "POST", body: form });
-    if (!res.ok) throw new Error();
-    const blob = await res.blob();
-    await loadPreview(blob, "improved-send-list.pdf");
-    generateHint.textContent = "Done. Your improved send list is in the preview below.";
-  } catch {
-    generateHint.textContent = "Couldn’t generate the send list. Check your connection and try again.";
-  } finally {
-    generateBtn.textContent = original;
-    generateBtn.disabled = !(credsFilled() && uploadedFile);
-  }
+$("remove-file").addEventListener("click", () => {
+  fetch(API.sendList, { method: "DELETE" }).catch(() => {});   // so a refresh doesn't bring it back
+  clearFile();
 });
 
-/* ---------- Preview / viewer ---------- */
-async function loadPreview(blob, name, existingDoc) {
+/* ---------- Generate (calls your backend) ---------- */
+function setLoading(on) {
+  loadingEl.hidden = !on;
+  if (on) emptyEl.hidden = true;
+}
+
+async function generate() {
+  const token = ++generateToken;
+  generateError.hidden = true;
+  clearPreview();
+  setLoading(true);
   try {
-    pdfDoc = existingDoc || await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
+    const form = new FormData();
+    form.append("file", uploadedFile);
+    form.append("pageCount", String(uploadedPages));
+    const res = await fetch(API.sendList, { method: "POST", body: form });
+    if (res.status === 401) { if (token === generateToken) sessionExpired(); return; }
+    if (!res.ok) throw new Error();
+    const blob = await res.blob();
+    if (token !== generateToken) return;   // file was removed or replaced meanwhile
+    setLoading(false);
+    await loadPreview(blob);
+  } catch {
+    if (token !== generateToken) return;
+    setLoading(false);
+    clearPreview("The send list couldn’t be generated.");
+    generateErrorText.textContent = "Couldn’t generate the send list. Check your connection and try again.";
+    generateError.hidden = false;
+  }
+}
+
+$("retry-btn").addEventListener("click", () => { if (uploadedFile) generate(); });
+
+/* ---------- Preview / viewer ---------- */
+async function loadPreview(blob) {
+  try {
+    pdfDoc = await pdfjsLib.getDocument({ data: await blob.arrayBuffer() }).promise;
   } catch {
     clearPreview("The preview couldn’t be loaded.");
     return;
   }
   previewBlob = blob;
-  previewName = name;
   emptyEl.hidden = true;
   toolbar.classList.remove("disabled");
   printBtn.disabled = false;
@@ -610,12 +642,19 @@ printBtn.addEventListener("click", () => {
   document.body.appendChild(frame);
 });
 
+// e.g. "2026-10-15 - Send List.pdf", using the viewer's local date
+function sendListFileName() {
+  const d = new Date();
+  const ymd = [d.getFullYear(), d.getMonth() + 1, d.getDate()].map(n => String(n).padStart(2, "0")).join("-");
+  return `${ymd} - Send List.pdf`;
+}
+
 downloadBtn.addEventListener("click", () => {
   if (!previewBlob) return;
   const url = URL.createObjectURL(previewBlob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = previewName;
+  a.download = sendListFileName();
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -623,8 +662,36 @@ downloadBtn.addEventListener("click", () => {
 });
 
 /* ---------- Init ---------- */
-updateGenerate();
 updateNavButtons(1);
+
+// Resume an existing session so a refresh doesn't sign the user out,
+// and bring back the send list saved with it.
+(async () => {
+  let session = null;
+  try {
+    const res = await fetch(API.session);
+    if (res.ok) session = await res.json();
+  } catch { /* server unreachable: show sign-in */ }
+  showView(session?.userId);
+  if (session?.sendList) restoreSendList(session.sendList);
+})();
+
+async function restoreSendList({ fileName, fileSize, pageCount }) {
+  const token = ++generateToken;
+  showFileChip(fileName, fileSize, pageCount);
+  clearPreview();
+  setLoading(true);
+  try {
+    const res = await fetch(API.sendList);
+    if (!res.ok) throw new Error();
+    const blob = await res.blob();
+    if (token !== generateToken) return;
+    setLoading(false);
+    await loadPreview(blob);
+  } catch {
+    if (token === generateToken) clearFile();   // nothing usable saved: start fresh
+  }
+}
 </script>
 </body>
 </html>
