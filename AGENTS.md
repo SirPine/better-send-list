@@ -18,18 +18,19 @@ That is the whole job. The PDF already has the title, call number, location and 
 
 ## Current state
 
-- `server.js`: Express server. It serves the page, handles in-memory sessions (an HttpOnly cookie, 8-hour idle timeout) and accepts the PDF upload. It keeps the latest generated list with the session, so a page refresh restores it.
+- `src/server.js`: Express app and API routes. It serves `public/` as static files and accepts the PDF upload. It keeps the latest generated list with the session, so a page refresh restores it.
   - **Sign-in is a placeholder.** It accepts any non-empty user ID and password (`TODO` in `POST /api/session`).
   - **Generating is a placeholder.** It returns the uploaded PDF unchanged (`TODO` in `POST /api/send-list`).
-- `send-list-builder.html`: the whole front end (sign-in view, then the upload and preview view). It previews with PDF.js.
-- Run it with `npm run dev`, which restarts on `server.js` changes, or `npm start`. It serves http://localhost:3000. Restarting clears all sessions.
+- `src/sessions.js`: in-memory sessions (an HttpOnly cookie, 8-hour idle timeout).
+- `public/`: the front end. `index.html` has the markup (sign-in view, then the upload and preview view), `styles.css` the styles, and `app.js` the behavior. It previews with PDF.js.
+- Run it with `npm run dev`, which restarts when files in `src/` change, or `npm start`. It serves http://localhost:3000. Restarting clears all sessions. Changes in `public/` need only a browser refresh.
 
 ## Connecting to Symphony (blocked on library IT)
 
 - The public catalog is SirsiDynix Enterprise, hosted by SirsiDynix at `bepl.ent.sirsi.net`, and reachable from outside the library.
 - The ILSWS base URL and a **client ID** must come from the library system's central IT. They are not known yet. `bepl.sirsi.net` does not exist.
 - **Do not guess hostnames or client IDs or attempt logins against the live system.** Wait for IT to provide them.
-- When they arrive, the server uses them to read each item's circ note. How the server signs in to Symphony (for example a dedicated library account held by the server) is not decided yet.
+- When they arrive, `src/server.js` uses them to read each item's circ note. How the server signs in to Symphony (for example a dedicated library account held by the server) is not decided yet.
 
 ## Sign-in (needs rework, not decided yet)
 
