@@ -14,7 +14,7 @@ That is the whole job. The PDF already has the title, call number, location and 
 ## What needs the library system and what doesn't
 
 - **Barcodes need no library access.** The item IDs are already printed on the send list. Read them from the PDF and draw the barcode locally. Use Code 128 unless the user says their scanners need something else (Codabar is the other common library format).
-- **Only the circulation notes need Symphony.** That's one lookup per item, by item ID, through SirsiDynix Symphony Web Services (ILSWS), using the staff member's own login.
+- **Only the circulation notes need Symphony.** That's one lookup per item, by item ID, through SirsiDynix Symphony Web Services (ILSWS).
 
 ## Current state
 
@@ -29,7 +29,12 @@ That is the whole job. The PDF already has the title, call number, location and 
 - The public catalog is SirsiDynix Enterprise, hosted by SirsiDynix at `bepl.ent.sirsi.net`, and reachable from outside the library.
 - The ILSWS base URL and a **client ID** must come from the library system's central IT. They are not known yet. `bepl.sirsi.net` does not exist.
 - **Do not guess hostnames or client IDs or attempt logins against the live system.** Wait for IT to provide them.
-- When they arrive, the sign-in should exchange the staff login for an ILSWS session token. Store **only the token** in the session, never the password. The item lookup then uses that token to read each item's circ note.
+- When they arrive, the server uses them to read each item's circ note. How the server signs in to Symphony (for example a dedicated library account held by the server) is not decided yet.
+
+## Sign-in (needs rework, not decided yet)
+
+- People sign in to **this server**, not to WorkFlows. The current page and session code are a placeholder for that.
+- **Don't build a real login or change how sign-in works** until the user decides the design: who has accounts, how they're created, and how passwords are stored.
 
 ## Next work that doesn't need IT
 

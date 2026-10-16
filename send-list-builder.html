@@ -125,8 +125,6 @@
   .field label { font-size: 14px; font-weight: 600; }
   .field input { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 16px; background: var(--surface); outline: none; transition: border-color .15s, box-shadow .15s; }
   .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  .note { display: flex; gap: 10px; align-items: flex-start; background: var(--paper); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--muted); }
-  .note svg { flex-shrink: 0; margin-top: 1px; }
   .status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
   .status.err { color: var(--danger); }
   .status.pending { color: var(--muted); font-weight: 500; }
@@ -209,20 +207,16 @@
   <section class="signin-view" id="signin-view" hidden>
     <form class="card signin-card" id="signin-form" aria-labelledby="wf-title" novalidate>
       <div>
-        <h2 class="card-title" id="wf-title">Sign in to WorkFlows</h2>
-        <p class="card-sub">Used only to look up item records for this list.</p>
+        <h2 class="card-title" id="wf-title">Sign in</h2>
+        <p class="card-sub">Retrieve circulation notes to assist in finding library material.</p>
       </div>
       <div class="field">
         <label for="wf-user">User ID</label>
-        <input id="wf-user" type="text" autocomplete="username" placeholder="Enter your WorkFlows user ID" />
+        <input id="wf-user" type="text" autocomplete="username" placeholder="Enter your user ID" />
       </div>
       <div class="field">
         <label for="wf-pass">Password</label>
         <input id="wf-pass" type="password" autocomplete="current-password" placeholder="Enter your password" />
-      </div>
-      <div class="note">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Your password is sent securely and never saved.</span>
       </div>
       <span class="status" id="wf-status" role="status" aria-live="polite"></span>
       <button class="btn btn-solid btn-block" id="signin-btn" type="submit">Sign in</button>
@@ -236,7 +230,7 @@
       <section class="card" aria-labelledby="pdf-title">
         <div>
           <h2 class="card-title" id="pdf-title">Upload send list PDF here</h2>
-          <p class="card-sub">This program will automatically insert clerk notes and barcodes into the send list.</p>
+          <p class="card-sub">This program will automatically add each item’s circulation notes and a scannable barcode to the send list.</p>
         </div>
         <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Upload send list PDF">
           <div class="drop-icon">
