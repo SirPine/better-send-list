@@ -18,8 +18,10 @@
     --accent-soft: #EEF2FF;     /* color/gold-soft */
     --accent-faint: #F5F6FF;    /* color/teal-soft */
     --ink: #0F172A;             /* color/navy, color/text */
-    --ink-dark: #020617;        /* color/navy-dark */
     --paper: #F8FAFC;           /* color/paper */
+    --accent-dark: #4338CA;     /* hover, and accent text on --page */
+    --page: #D4D9E1;            /* the one gray: page background and behind PDF pages */
+    --on-page-muted: #475569;   /* secondary text placed directly on --page (readable contrast) */
     --surface: #FFFFFF;         /* color/surface */
     --border: #E2E8F0;          /* color/border */
     --muted: #64748B;           /* color/text-muted */
@@ -27,9 +29,7 @@
     --danger: #DC2626;
     --disabled-bg: #F1F5F9;     /* color/disabled-bg */
     --disabled-text: #94A3B8;   /* color/disabled-text */
-    --panel-from: #EEF0F8;      /* soft pastel gradient behind the sign-in page */
-    --panel-to: #DDE2F0;
-    --viewer-bg: #E2E8F0;       /* behind PDF pages, so white pages stand out */
+    --viewer-bg: var(--page);   /* same gray as the page, so white PDF pages match the white cards */
     --radius: 16px;
     --shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   }
@@ -38,7 +38,7 @@
   html, body { margin: 0; }
   body {
     font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-    background: var(--paper);
+    background: var(--page);
     color: var(--ink);
     font-size: 15px;
     line-height: 1.5;
@@ -59,9 +59,12 @@
   .brand-mark { width: 40px; height: 40px; border-radius: 10px; background: var(--accent); display: grid; place-items: center; color: #fff; flex-shrink: 0; }
   .brand-name { font-weight: 600; font-size: 17px; letter-spacing: -0.01em; }
   .brand-sub { font-size: 13px; color: var(--muted); }
-  .header-links { display: flex; gap: 28px; }
-  .header-links a, .header-links button { color: var(--muted); text-decoration: none; font-size: 14px; background: none; border: 0; padding: 0; cursor: pointer; }
-  .header-links a:hover, .header-links button:hover { color: var(--ink); }
+  .header-account { display: flex; align-items: center; gap: 16px; font-size: 14px; color: var(--muted); }
+  .header-account strong { color: var(--ink); font-weight: 600; }
+  .header-signout { border: 1.5px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 14px; font-weight: 600; font-size: 14px; cursor: pointer; transition: border-color .15s, color .15s; }
+  .header-signout:hover { border-color: var(--accent); color: var(--accent); }
+  .header-signout:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
+  @media (max-width: 600px) { .header-account .account-label { display: none; } .brand-sub { display: none; } }
 
   /* ---------- Help dialog ---------- */
   .dialog { border: 0; border-radius: var(--radius); padding: 0; width: min(400px, calc(100vw - 32px)); background: var(--surface); color: var(--ink); box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2); }
@@ -77,21 +80,18 @@
   /* ---------- Intro ---------- */
   main.container { flex: 1; width: 100%; display: flex; flex-direction: column; padding-top: 24px; padding-bottom: 24px; }
   h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 700; margin: 0 0 10px; }
-  .lead { font-size: 16px; color: var(--muted); max-width: 780px; margin: 0 0 24px; }
   @media (max-width: 900px) { h1 { font-size: 30px; } }
 
   /* ---------- Views ---------- */
   .signin-view { max-width: 440px; width: 100%; margin: auto; text-align: center; }
-  .signin-view .lead { margin: 0 auto 24px; }
-  .signin-card { text-align: left; border-color: transparent; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); }
-  body.is-signin { background: linear-gradient(160deg, var(--panel-from), var(--panel-to)); }
+  .signin-card { text-align: left; border-color: transparent; box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08); padding-bottom: 18px; }
+  /* The message line always takes its space, so the card doesn't resize when a message appears */
+  .signin-card .status { min-height: 21px; margin: -6px 0 -6px; }
+  .signin-help { display: flex; justify-content: center; margin-top: -4px; font-size: 14px; }
+  .signin-help .link { text-decoration: none; }
+  .signin-help .link:hover { text-decoration: underline; }
+  #build-view { display: flex; flex-direction: column; gap: 24px; }   /* stacked on narrow screens; a grid on wide ones */
   .build-side { display: flex; flex-direction: column; }
-  /* Account row, just under the upload card */
-  .signed-in { padding: 0 4px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 14px; color: var(--muted); }
-  .build-side .card { margin-bottom: 16px; }
-  .signed-in strong { color: var(--ink); font-weight: 600; }
-  .signed-in .link { text-decoration: none; }
-  .signed-in .link:hover { text-decoration: underline; }
 
   /* On wide screens the page fits the window; only the preview scrolls. */
   @media (min-width: 900px) {
@@ -102,13 +102,15 @@
     .preview-card { min-height: 0; }
     .preview-card .viewer { flex: 1; height: auto; max-height: none; min-height: 0; }
   }
+  /* Short screens: squeeze the sign-in page only. The upload page keeps an even 24px
+     above, between and below its cards (the preview shrinks to fit instead). */
   @media (max-height: 760px) {
-    main.container { padding-top: 12px; padding-bottom: 12px; }
+    main.container:has(> #signin-view:not([hidden])) { padding-top: 12px; padding-bottom: 12px; }
   }
   @media (max-height: 680px) {
-    .signin-view .lead { margin-bottom: 16px; }
-    .signin-card { padding: 20px 24px; gap: 12px; }
+    .signin-card { padding: 18px 24px 14px; gap: 12px; }
     .signin-card .field input { padding: 10px 14px; }
+    main.container:has(> #signin-view:not([hidden])) { padding-top: 6px; padding-bottom: 6px; }
   }
 
   /* ---------- Cards ---------- */
@@ -127,16 +129,15 @@
   .note svg { flex-shrink: 0; margin-top: 1px; }
   .status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
   .status.err { color: var(--danger); }
-  .status:empty { display: none; }
   .status.pending { color: var(--muted); font-weight: 500; }
 
   /* ---------- Buttons ---------- */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 11px 20px 11px 18px; font-weight: 600; font-size: 15px; cursor: pointer; border: 1.5px solid transparent; transition: background .15s, border-color .15s, box-shadow .15s, color .15s; white-space: nowrap; }
   .btn:focus-visible { outline: 3px solid var(--accent-soft); outline-offset: 2px; }
-  .btn-outline { background: var(--surface); border-color: var(--ink); color: var(--ink); }
+  .btn-outline { background: var(--surface); border-color: var(--accent); color: var(--accent); }
   .btn-outline:hover:not(:disabled) { background: var(--accent-faint); border-width: 2px; padding: 10.5px 19.5px 10.5px 17.5px; }
-  .btn-solid { background: var(--ink); border-color: var(--ink); color: #fff; }
-  .btn-solid:hover:not(:disabled) { background: var(--ink-dark); border-color: var(--ink-dark); box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18); }
+  .btn-solid { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-solid:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); box-shadow: 0 2px 6px rgba(67, 56, 202, 0.25); }
   .btn-block { width: 100%; padding: 13px 20px; }
   .btn-accent { background: var(--accent); color: #fff; font-size: 16px; padding: 14px 32px; border-radius: 12px; }
   .btn-accent:hover:not(:disabled) { filter: brightness(0.92); box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); }
@@ -177,10 +178,10 @@
   .viewport { flex: 1; overflow: auto; position: relative; }
   .pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 32px; min-width: fit-content; }
   .pages canvas { background: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); display: block; }
-  .spinner { width: 36px; height: 36px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+  .spinner { width: 36px; height: 36px; border: 3px solid rgba(15, 23, 42, 0.12); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
-  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-weight: 500; font-size: 16px; text-align: center; padding: 16px; }
+  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--on-page-muted); font-weight: 500; font-size: 16px; text-align: center; padding: 16px; }
 </style>
 </head>
 <body>
@@ -196,18 +197,16 @@
         <div class="brand-sub">Send List Builder</div>
       </div>
     </div>
-    <nav class="header-links" aria-label="Help">
-      <button type="button" id="help-btn" aria-haspopup="dialog">Help</button>
-    </nav>
+    <div class="header-account" id="header-account" hidden>
+      <span><span class="account-label">Signed in as </span><strong id="signed-in-user"></strong></span>
+      <button class="header-signout" id="signout-btn" type="button">Sign out</button>
+    </div>
   </div>
 </header>
 
 <main class="container">
   <!-- View 1: WorkFlows sign-in -->
   <section class="signin-view" id="signin-view" hidden>
-    <h1>Build a better send list</h1>
-    <p class="lead">Upload today’s send list and get it back with titles, call numbers and locations, grouped by shelf.</p>
-
     <form class="card signin-card" id="signin-form" aria-labelledby="wf-title" novalidate>
       <div>
         <h2 class="card-title" id="wf-title">Sign in to WorkFlows</h2>
@@ -225,8 +224,9 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
         <span>Your password is sent securely and never saved.</span>
       </div>
-      <button class="btn btn-solid btn-block" id="signin-btn" type="submit">Sign in</button>
       <span class="status" id="wf-status" role="status" aria-live="polite"></span>
+      <button class="btn btn-solid btn-block" id="signin-btn" type="submit">Sign in</button>
+      <div class="signin-help"><button class="link" type="button" data-help aria-haspopup="dialog">Need help?</button></div>
     </form>
   </section>
 
@@ -257,10 +257,6 @@
         </div>
         <p class="error-msg" id="generate-error" role="alert" hidden><span id="generate-error-text"></span> <button class="link" id="retry-btn" type="button">Try again</button></p>
       </section>
-      <div class="signed-in">
-        <span>Signed in as <strong id="signed-in-user"></strong></span>
-        <button class="link" id="signout-btn" type="button">Sign out</button>
-      </div>
     </div>
 
     <!-- Preview -->
@@ -386,9 +382,9 @@ function setStatus(text, kind) {
 /* ---------- WorkFlows ---------- */
 function showView(userId) {
   const signedIn = !!userId;
-  document.body.classList.toggle("is-signin", !signedIn);
   signinView.hidden = signedIn;
   buildView.hidden = !signedIn;
+  $("header-account").hidden = !signedIn;
   $("signed-in-user").textContent = signedIn ? userId : "";
 }
 
@@ -681,7 +677,7 @@ downloadBtn.addEventListener("click", () => {
 
 /* ---------- Help ---------- */
 const helpDialog = $("help-dialog");
-$("help-btn").addEventListener("click", () => helpDialog.showModal());
+document.querySelectorAll("[data-help]").forEach(btn => btn.addEventListener("click", () => helpDialog.showModal()));
 // Clicking the dimmed backdrop (outside the dialog box) closes it.
 helpDialog.addEventListener("click", (e) => { if (e.target === helpDialog) helpDialog.close(); });
 
