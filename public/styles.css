@@ -35,8 +35,7 @@ body {
   flex-direction: column;
 }
 button, input, select { font: inherit; color: inherit; }
-.container { max-width: 1440px; margin: 0 auto; padding: 0 80px; }
-@media (max-width: 900px) { .container { padding: 0 16px; } }
+.container { max-width: 1440px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 80px); }   /* side margins shrink with the window */
 
 /* ---------- Header / footer ---------- */
 .site-header { background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -83,7 +82,7 @@ h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 70
 @media (min-width: 900px) {
   body { height: 100vh; height: 100dvh; }
   main.container { min-height: 0; overflow: auto; }
-  #build-view { flex: 1; min-height: 0; display: grid; grid-template-columns: 380px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 24px; }
+  #build-view { flex: 1; min-height: 0; display: grid; grid-template-columns: clamp(280px, 28vw, 380px) minmax(0, 1fr);   /* the upload column gives way first; the preview gets the rest */ grid-template-rows: minmax(0, 1fr); column-gap: 24px; }
   .build-side { min-height: 0; overflow: auto; }
   .preview-card { min-height: 0; }
   .preview-card .viewer { flex: 1; height: auto; max-height: none; min-height: 0; }
@@ -100,8 +99,7 @@ h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 70
 }
 
 /* ---------- Cards ---------- */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 28px; display: flex; flex-direction: column; gap: 16px; }
-@media (max-width: 600px) { .card { padding: 20px; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: clamp(18px, 2vw, 28px); display: flex; flex-direction: column; gap: 16px; }
 .card-head { display: flex; align-items: center; gap: 14px; }
 .card-title { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0; }
 .card-sub { font-size: 15px; color: var(--muted); margin: 2px 0 0; }
@@ -160,8 +158,16 @@ h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 70
 .divider { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 .text-btn { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--surface); font-weight: 600; font-size: 14px; cursor: pointer; }
 .text-btn:hover { background: var(--paper); border-color: #CBD5E1; }
+/* When the preview is narrow, keep its toolbar on one line: "Fit width" shows just its icon. */
+.preview-card { container-type: inline-size; }
+@container (max-width: 560px) {
+  .fit-label { display: none; }
+  .toolbar { gap: 8px; padding: 8px 10px; }
+  .tool-group { gap: 6px; }
+  .tool-text:not(#page-count) { display: none; }   /* drop the word "Page", keep "of 17" */
+}
 .viewport { flex: 1; overflow: auto; position: relative; }
-.pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 32px; min-width: fit-content; }
+.pages { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: clamp(12px, 2.5vw, 32px); min-width: fit-content; }
 .pages canvas { background: #fff; box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12); display: block; }
 .spinner { width: 36px; height: 36px; border: 3px solid rgba(15, 23, 42, 0.12); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

@@ -66,6 +66,7 @@ These came from the user; don't undo them without asking.
 - **Two views.**
   - Sign-in: a centered card with "Need help?" centered at its bottom.
   - Upload: the upload card on the left and the preview on the right, with an even 24px around and between the cards.
+  - **The preview gets the space:** side margins shrink with the window (`clamp(16px, 4vw, 80px)`) and the upload column flexes from 280 to 380px, so on a ~900px split-screen window the preview stays usable. The preview opens fitted to its width, and in a narrow preview the toolbar stays on one line ("Fit width" becomes icon-only, via a container query).
 - **Generation starts on upload.** There is no Generate button; a spinner shows in the preview while it runs.
 - **The sign-in card never resizes** when a message appears; its message line is always reserved.
 - **"Signed in as … / Sign out" is in the header, on the right.**

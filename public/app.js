@@ -228,9 +228,8 @@ async function loadPreview(blob) {
   downloadBtn.disabled = false;
   pageCount.textContent = `of ${pdfDoc.numPages}`;
   pageInput.value = "1";
-  fitMode = false;
-  setScale(1);
   viewport.scrollTop = 0;
+  await fitWidth();   // open filling the preview's width, however wide the window is
 }
 
 function clearPreview(message) {
@@ -286,7 +285,8 @@ async function fitWidth() {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(1);
   const natural = page.getViewport({ scale: 1 }).width;
-  const available = viewport.clientWidth - 64 - 16; // padding + scrollbar
+  const padding = parseFloat(getComputedStyle(pagesEl).paddingLeft) * 2;
+  const available = viewport.clientWidth - padding - 16;   // room for a scrollbar
   fitMode = true;
   setScale(available / natural);
 }
