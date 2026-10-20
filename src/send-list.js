@@ -1,24 +1,38 @@
 const path = require("node:path");
-const { PDFDocument, StandardFonts, rgb } = require("pdf-lib");
+const {
+  PDFDocument, PDFObjectCopier, StandardFonts, rgb,
+  pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath, fill, setFillingGrayscaleColor,
+} = require("pdf-lib");
 const bwipjs = require("bwip-js");
+const { pageContent, chunkContent } = require("./pdf-content");
 
-/* Builds the improved send list: for each item on the uploaded WorkFlows send list,
-   adds a "Circ note:" line under the item's ID column and a Code 128 barcode of the
-   item ID in the space to the right of the item. Nothing on the original is moved;
-   everything is drawn into empty space, using the list's own font, size and line spacing.
+/* Builds the improved send list from the WorkFlows send list (a Microsoft Access report).
+   For each item it adds a line under the item for its circ note, moves "item ID:…" out of
+   the item's last line, and puts a Code 128 barcode of the ID beside the item with the
+   digits under it:
 
-   Item layout this expects (two columns per item, from the WorkFlows export):
-       Call Number: XX .G704                 Type: Compact Disc
-       Title: Dookie                         Location: Open Shelf
-       Author: Green Day (Musical group)     ID: 000089241749224
-       Last discharged: 1/14/2025            Circ note: Rock under "Gr"   <- added */
+       J FICTION                                                 Last Discharged:
+          Barkley, Callie                                            08/23/2026
+          Liz and the sand castle contest / Callie Barkley ;       ||||||||||||||
+             copy:1   type:J-FICTION   location:B-OPENSHLF         ||||||||||||||
+             Note: Shelved in Openshelf                             0000238447387   <- added
+
+   The report packs items with no room for that line, and starts each location group on a
+   new page. So the list is cut into blocks (headings, and each item down to its ID line),
+   and the blocks are flowed onto fresh pages at full size: big gaps are closed up, a
+   heading is never left alone at the bottom of a page, and each page gets a new footer
+   with the report's date and a correct "Page X of N". Every barcode sits at the same
+   distance from the left edge on every page. */
 
 const ID_LABEL = /(?:^|\s)ID:\s*(\d{8,})?/;   // "ID:" with the number in the same text run, or…
 const LEADING_DIGITS = /^\s*(\d{8,})/;         // …the number as the next run on the line
-const BARCODE_GAP = 12;                        // space each side of a barcode (≥ the scanner's quiet zone)
-const NOTE_LABEL = /^\s*Circ note:/i;
+const PAGE_NUMBER = /Page\s+\d+\s+of\s+\d+/i;
 const PROCESSED_MARK = "better-send-list:processed";   // keyword stamped on lists this tool has already done
 const PRINT_MARGIN = 18;                       // keep additions ¼ inch from the paper edge, which every printer can print
+const FOOTER_GAP = 8;                          // keep the content at least this far above the page footer
+const MAX_GAP_LINES = 1.35;                    // gaps before headings are closed up to at most this many lines…
+const ITEM_GAP_LINES = 0.6;                    // …and the blank space after each item to this much
+const BARCODE_GAP = 12;                        // space each side of a barcode (≥ the scanner's quiet zone)
 const MAX_MODULE = 1.0;                        // widest bar unit, in points
 const MIN_MODULE = 0.55;                       // narrowest that still scans reliably when printed
 const BLACK = rgb(0, 0, 0);
@@ -33,53 +47,84 @@ class SendListError extends Error {}
 /**
  * @param {Buffer} pdfBytes  the uploaded send list
  * @param {(ids: string[]) => Promise<Map<string, string>>} getCircNotes
- * @returns {Promise<{ pdf: Buffer, summary: { items, notes, barcodes, notesSkipped, barcodesSkipped } }>}
+ * @returns {Promise<{ pdf: Buffer, summary: { items, notes, barcodes, notesShortened, barcodesSkipped, pages, originalPages } }>}
  */
 async function buildSendList(pdfBytes, getCircNotes) {
-  let doc;
+  let source;
   try {
-    doc = await PDFDocument.load(pdfBytes, { updateMetadata: false });
+    source = await PDFDocument.load(pdfBytes, { updateMetadata: false });
   } catch {
     throw new SendListError("This PDF couldn’t be opened for editing. It may be password-protected.");
   }
-  const keywords = doc.getKeywords() ?? "";
-  if (keywords.includes(PROCESSED_MARK)) {
+  if ((source.getKeywords() ?? "").includes(PROCESSED_MARK)) {
     throw new SendListError("This send list already has circ notes and barcodes added. Upload the original from WorkFlows.");
   }
 
   const pages = await readPages(pdfBytes);
-  const found = pages.flatMap((page, pageIndex) => findItems(page).map((item) => ({ ...item, pageIndex })));
-  if (found.length === 0) {
+  const list = analyse(pages, source.getPages().map((p) => p.getMediaBox()));
+  if (list.items.length === 0) {
     throw new SendListError("No item IDs were found in this PDF. Upload a send list exported from WorkFlows.");
   }
+  const notes = await getCircNotes([...new Set(list.items.map((item) => item.id))]);
 
-  const notes = await getCircNotes([...new Set(found.map((item) => item.id))]);
-  const fonts = new FontSet(doc);
-  const summary = { items: found.length, notes: 0, barcodes: 0, notesSkipped: 0, barcodesSkipped: 0 };
+  const out = await PDFDocument.create();
+  const fonts = new FontSet(out);
+  const layout = paginate(list);
+  placeBarcodes(list);
+  const summary = { items: list.items.length, notes: 0, barcodes: 0, notesShortened: 0, barcodesSkipped: 0, pages: layout.length, originalPages: pages.length };
 
-  const spots = found.map((item) => layoutFor(pages[item.pageIndex], item));
-  alignBarcodes(found, spots);
+  // Each block is drawn from only its own pieces of the original page's content, so nothing
+  // hidden is left behind (selecting, copying or searching the output finds each line once).
+  const sourcePages = source.getPages();
+  const content = sourcePages.map((page) => chunkContent(pageContent(page)));
+  const copier = PDFObjectCopier.for(source.context, out.context);   // one copier: shared fonts are copied once
+  const resources = new Map();
+  const resourcesOf = (p) => {
+    if (!resources.has(p)) resources.set(p, out.context.register(copier.copy(sourcePages[p].node.Resources())));
+    return resources.get(p);
+  };
+  // Pages whose content couldn't be read are drawn whole and clipped to each block instead.
+  let embedded;
+  const original = async (p) => (embedded ??= await out.embedPages(sourcePages))[p];
 
-  found.forEach((item, i) => {
-    const out = doc.getPage(item.pageIndex);
-    const spot = spots[i];
+  for (const [index, placed] of layout.entries()) {
+    const box = list.box;
+    const page = out.addPage([box.width, box.height]);
+    page.setMediaBox(box.x, box.y, box.width, box.height);
 
-    const note = notes.get(item.id);
-    if (note && !spot.hasNote) {   // an item that already shows a circ note keeps it
-      if (spot.noteY !== null) {
-        drawNote(out, fonts, item, spot, note);
-        summary.notes++;
+    for (const { block, dy } of placed) {
+      const chunks = content[block.page];
+      if (chunks) {
+        drawBlock(out, page, block, dy, chunks, resourcesOf(block.page));
+        if (block.item?.removeId) redrawIdLine(page, fonts, block.item, dy);
       } else {
-        summary.notesSkipped++;
+        const from = await original(block.page);
+        for (const piece of pieces(block)) {
+          const { left, right, bottom, top, dx } = piece;
+          page.pushOperators(pushGraphicsState(), rectangle(round(left + dx), round(bottom + dy), round(right - left), round(top - bottom)), clip(), endPath());
+          page.drawPage(from, { x: round(block.box.x + dx), y: round(block.box.y + dy) });
+          page.pushOperators(popGraphicsState());
+        }
       }
+
+      const item = block.item;
+      if (!item) continue;
+      const note = notes.get(item.id);
+      if (note) {
+        if (drawNote(page, fonts, item, dy, note, list)) summary.notesShortened++;
+        summary.notes++;
+      }
+      if (drawBarcode(page, fonts, item, dy, list)) summary.barcodes++;
+      else summary.barcodesSkipped++;
     }
 
-    if (drawBarcode(out, spot)) summary.barcodes++;
-    else summary.barcodesSkipped++;
-  });
+    drawFooter(page, fonts, list.footer, index + 1, layout.length);
+  }
 
-  doc.setKeywords([...keywords.split(/\s+/).filter(Boolean), PROCESSED_MARK]);
-  return { pdf: Buffer.from(await doc.save()), summary };
+  out.setTitle(source.getTitle() ?? "Send list");
+  out.setKeywords([...(source.getKeywords() ?? "").split(/\s+/).filter(Boolean), PROCESSED_MARK]);
+  out.setProducer("Send List Builder");
+  return { pdf: Buffer.from(await out.save()), summary };
 }
 
 /* ---------- Reading the text and where it sits ---------- */
@@ -112,8 +157,7 @@ async function readPages(pdfBytes) {
           const [a, b, c, d, x, y] = t.transform;
           return { str: t.str, x, y, width: t.width, size: Math.hypot(c, d) || Math.hypot(a, b), family: styles[t.fontName]?.fontFamily ?? "sans-serif" };
         });
-      const [, bottom, right] = page.view;
-      pages.push({ texts, lines: groupIntoLines(texts), bottom, right: right - PRINT_MARGIN });
+      pages.push({ texts, lines: groupIntoLines(texts) });
     }
     return pages;
   } finally {
@@ -129,128 +173,262 @@ function groupIntoLines(texts) {
     if (line) line.items.push(t);
     else lines.push({ y: t.y, size: t.size, items: [t] });
   }
-  for (const line of lines) line.items.sort((p, q) => p.x - q.x);
+  for (const line of lines) {
+    line.items.sort((p, q) => p.x - q.x);
+    line.top = Math.max(...line.items.map(top));
+    line.bottom = Math.min(...line.items.map(bottom));
+  }
   return lines.sort((p, q) => q.y - p.y);
 }
 
-// Every "ID: <number>" on the page, with the text run holding the label and its line.
-function findItems(page) {
-  const found = [];
-  for (const line of page.lines) {
-    line.items.forEach((run, i) => {
-      const match = run.str.match(ID_LABEL);
-      if (!match) return;
-      const id = match[1] ?? line.items[i + 1]?.str.match(LEADING_DIGITS)?.[1];
-      if (id) found.push({ id, label: run, line });
-    });
+const top = (t) => t.y + t.size * 0.8;       // ascenders
+const bottom = (t) => t.y - t.size * 0.25;   // descenders
+
+// The "ID: <number>" on a line, if it has one.
+function itemOn(line) {
+  for (const [i, run] of line.items.entries()) {
+    const match = run.str.match(ID_LABEL);
+    if (!match) continue;
+    const id = match[1] ?? line.items[i + 1]?.str.match(LEADING_DIGITS)?.[1];
+    if (id) return { id, run, line };
   }
-  return found;
+  return null;
 }
 
-/* ---------- Working out where the additions go ---------- */
+/* ---------- Cutting the list into blocks ---------- */
 
-function layoutFor(page, item) {
-  const { label, line } = item;
-  const size = label.size;
-  const colX = label.x;
-  const inColumn = (l) => l.items.some((t) => Math.abs(t.x - colX) <= size * 0.6);
-  const hasOtherId = (l) => l !== line && l.items.some((t) => ID_LABEL.test(t.str) && Math.abs(t.x - colX) <= size * 0.6);
+function analyse(pages, boxes) {
+  const allIds = pages.flatMap((page) => page.lines.map(itemOn).filter(Boolean));
+  const size = allIds[0]?.run.size ?? 11;
+  const lineHeight = measureLineHeight(pages, allIds, size);
+  const blocks = [];
+  const items = [];
+  let footer = null;
+  let topLimit = Infinity;
 
-  // The lines of this item's column, and the spacing between them.
-  const col = page.lines.filter(inColumn);
-  const at = col.indexOf(line);
-  const gapAbove = at > 0 ? col[at - 1].y - line.y : Infinity;
-  const gapBelow = at < col.length - 1 ? line.y - col[at + 1].y : Infinity;
-  const nearest = Math.min(gapAbove, gapBelow);
-  const lineHeight = nearest >= size * 0.9 && nearest <= size * 2.2 ? nearest : size * 1.3;
-  const sameBlock = (upper, lower) => upper.y - lower.y <= lineHeight * 1.35;
+  pages.forEach((page, p) => {
+    const box = boxes[p];
+    const lines = page.lines;
 
-  // Rows of this item in the ID's column: up to 3 above the ID and 2 below, stopping at a gap or another item.
-  let top = at;
-  while (top > 0 && at - top < 3 && sameBlock(col[top - 1], col[top]) && !hasOtherId(col[top - 1])) top--;
-  let bottom = at;
-  while (bottom < col.length - 1 && bottom - at < 2 && sameBlock(col[bottom], col[bottom + 1]) && !hasOtherId(col[bottom + 1])) bottom++;
-  const rows = col.slice(top, bottom + 1);
-  const hasNote = rows.some((r) => r.items.some((t) => NOTE_LABEL.test(t.str) && Math.abs(t.x - colX) <= size * 0.6));
+    // A page footer (date, "Page X of N") is the bottom line, if it has a page number or is set well
+    // apart from the rest. It's redrawn on every new page.
+    const last = lines[lines.length - 1];
+    const aboveLast = lines[lines.length - 2];
+    const isFooter = Boolean(last && !itemOn(last) &&
+      (last.items.some((t) => PAGE_NUMBER.test(t.str)) || (aboveLast && aboveLast.y - last.y > lineHeight * 3)));
+    if (isFooter) footer ??= last;
+    const content = isFooter ? lines.slice(0, -1) : lines;
+    if (!content.length) return;
+    if (topLimit === Infinity) topLimit = content[0].top;   // pages start where the report's first page does
 
-  // The note goes on the row right below the item's last row in this column. If that row is
-  // taken, it's skipped rather than placed further down, where it could look like part of the next item.
-  const candidate = rows[rows.length - 1].y - lineHeight;
-  const noteY = candidate >= page.bottom + size && isFree(page, colX - 2, page.right, candidate - size * 0.3, candidate + size * 0.9) ? candidate : null;
+    // A block ends after an item's ID line, or where a gap of more than a line and a half opens up.
+    const pageBlocks = [];
+    let current = [];
+    const close = (item) => {
+      if (current.length) pageBlocks.push({ page: p, box, lines: current, item, top: Math.max(...current.map((l) => l.top)), bottom: Math.min(...current.map((l) => l.bottom)) });
+      current = [];
+    };
+    content.forEach((line, i) => {
+      if (i > 0 && content[i - 1].y - line.y > lineHeight * 1.4) close(null);
+      current.push(line);
+      const found = itemOn(line);
+      if (found) close(describeItem(found, current, lineHeight));
+    });
+    close(null);
 
-  // The barcode sits right of the column, from the top of the item's first line to the bottom of its ID line.
-  const columnRight = Math.max(...rows.flatMap((r) => r.items.filter((t) => t.x >= colX - size * 0.6).map((t) => t.x + t.width)));
-  const barTop = rows[0].y + size * 0.7;     // cap height
-  const barBottom = line.y - size * 0.2;     // descenders
-  let right = page.right;
-  for (const t of page.texts) {   // stop short of anything already printed in that space
-    if (t.x > columnRight && t.x < right && t.y + t.size * 0.8 > barBottom && t.y - t.size * 0.25 < barTop) right = t.x;
-  }
+    // Each block's clip reaches halfway to its neighbours (so heading underlines come along), at most 6pt past its text.
+    pageBlocks.forEach((block, i) => {
+      const above = pageBlocks[i - 1], below = pageBlocks[i + 1];
+      block.clipTop = above ? Math.min(block.top + 6, (above.bottom + block.top) / 2) : block.top + 6;
+      block.clipBottom = below ? Math.max(block.bottom - 6, (block.bottom + below.top) / 2) : Math.max(block.bottom - 6, isFooter ? last.top + 1 : box.y);
+      if (block.item) items.push(block.item);
+    });
+    blocks.push(...pageBlocks);
+  });
 
+  const box = boxes[0];
+  const footerTop = footer ? footer.top : null;
   return {
-    size, colX, lineHeight, noteY, hasNote,
-    textRight: page.right,
-    barcode: { widths: barcodeWidths(item.id), columnRight, right: right - BARCODE_GAP, top: barTop, bottom: barBottom, x: null, module: null },
+    blocks, items, lineHeight, box,
+    footer: footer && { runs: footer.items },
+    topLimit: Math.min(topLimit, box.y + box.height - PRINT_MARGIN),
+    bottomLimit: footerTop !== null ? footerTop + FOOTER_GAP : box.y + PRINT_MARGIN,
+    barRight: box.x + box.width - PRINT_MARGIN,
   };
 }
 
-// On each page, barcodes share one left edge and one bar width, so they line up in a neat column.
-// Pages where that doesn't leave room fall back to fitting each barcode on its own.
-function alignBarcodes(found, spots) {
-  const byPage = new Map();
-  found.forEach((item, i) => byPage.set(item.pageIndex, [...(byPage.get(item.pageIndex) ?? []), spots[i].barcode]));
-  for (const bars of byPage.values()) {
-    const x = Math.max(...bars.map((b) => b.columnRight)) + BARCODE_GAP;
-    const module = Math.min(MAX_MODULE, ...bars.map((b) => (b.right - x) / modules(b.widths)));
-    for (const b of bars) {
-      if (module >= MIN_MODULE) {
-        b.x = x;
-        b.module = module;
-      } else {
-        b.x = b.columnRight + BARCODE_GAP;
-        b.module = Math.min(MAX_MODULE, (b.right - b.x) / modules(b.widths));
-      }
+// Where an item's pieces go: its ID line, the title line above it, and the "item ID:…" text to take out.
+function describeItem({ id, run, line }, blockLines, lineHeight) {
+  const size = run.size;
+  const i = blockLines.indexOf(line);
+  const title = i > 0 && blockLines[i - 1].y - line.y <= lineHeight * 1.4 ? blockLines[i - 1] : null;
+  const next = line.items.find((t) => t !== run && t.x >= run.x + run.width - 0.5 && t.str.trim());
+  const gap = next ? next.x - run.x : run.width;
+  const bandTop = top(run) + 0.5;
+  // Only take the ID out if nothing else in the block reaches into the ID line's band.
+  const removeId = !blockLines.some((l) => l !== line && l.bottom < bandTop);
+  const lineRight = Math.max(...line.items.map((t) => t.x + t.width)) - (removeId ? gap : 0);
+  return {
+    id, run, line, size, removeId, bandTop,
+    idStart: run.x, idEnd: run.x + gap,
+    lineX: line.items[0].x,
+    barTop: title ? title.y + size * 0.45 : line.y + size * 0.72,   // a little below the top of the title, clear of the date above
+    textRight: Math.max(lineRight, ...(title ? title.items.map((t) => t.x + t.width) : [])),
+  };
+}
+
+// The parts of a block to draw: all of it, or, when the ID comes out, the ID line in two pieces
+// with the part after "item ID:…" slid left to close the gap.
+function pieces(block) {
+  const left = block.box.x, right = block.box.x + block.box.width;
+  const item = block.item;
+  if (!item?.removeId) return [{ left, right, bottom: block.clipBottom, top: block.clipTop, dx: 0 }];
+  return [
+    { left, right, bottom: item.bandTop, top: block.clipTop, dx: 0 },
+    { left, right: item.idStart, bottom: block.clipBottom, top: item.bandTop, dx: 0 },
+    { left: item.idEnd, right, bottom: block.clipBottom, top: item.bandTop, dx: item.idStart - item.idEnd },
+  ];
+}
+
+// The spacing between lines inside an item, from the line above each ID line.
+function measureLineHeight(pages, ids, size) {
+  const gaps = [];
+  for (const page of pages) {
+    for (const { line } of ids) {
+      const i = page.lines.indexOf(line);
+      if (i > 0) gaps.push(page.lines[i - 1].y - line.y);
     }
   }
+  const usable = gaps.filter((g) => g >= size * 0.9 && g <= size * 2.2).sort((a, b) => a - b);
+  return usable.length ? usable[Math.floor(usable.length / 2)] : size * 1.35;
 }
 
-function barcodeWidths(id) {
-  return bwipjs.raw("code128", id, {})[0].sbs;   // bar, space, bar, … in modules
+/* ---------- Flowing blocks onto pages ---------- */
+
+// Returns pages of { block, dy }, where dy moves the block from its place on the original page.
+function paginate(list) {
+  const { blocks, lineHeight, topLimit, bottomLimit } = list;
+  const maxGap = (prev) => lineHeight * (prev?.item ? ITEM_GAP_LINES : MAX_GAP_LINES);
+  const height = (b) => b.top - b.bottom + (b.item ? lineHeight : 0);   // items get one added line
+  const gapBefore = (b, prev) => (prev && prev.page === b.page ? Math.min(prev.bottom - b.top, maxGap(prev)) : maxGap(prev));
+
+  const pages = [[]];
+  let y = topLimit;
+  blocks.forEach((block, i) => {
+    let gap = pages.at(-1).length ? gapBefore(block, blocks[i - 1]) : 0;
+    let need = gap + height(block);
+    const next = blocks[i + 1];
+    if (!block.item && next) need += gapBefore(next, block) + height(next);   // keep a heading with what follows it
+    if (pages.at(-1).length && y - need < bottomLimit) {
+      pages.push([]);
+      y = topLimit;
+      gap = 0;
+    }
+    const dy = y - gap - block.top;
+    pages.at(-1).push({ block, dy });
+    y = block.bottom + dy - (block.item ? lineHeight : 0);
+  });
+  return pages;
 }
+
+// Every barcode starts at the same distance from the left edge, right of the widest item text.
+// If that would leave any barcode too narrow to scan, each starts after its own item's text instead.
+function placeBarcodes(list) {
+  const own = (item) => item.textRight + BARCODE_GAP;
+  const shared = Math.max(...list.items.map(own));
+  const fits = list.items.every((item) => (list.barRight - shared) / modules(barcodeWidths(item.id)) >= MIN_MODULE);
+  for (const item of list.items) item.barLeft = fits ? shared : own(item);
+}
+
+const round = (n) => Math.round(n * 1000) / 1000;   // 1/1000 pt is far finer than any printer
+
+const barcodeWidths = (id) => bwipjs.raw("code128", id, {})[0].sbs;   // bar, space, bar, … in modules
 const modules = (widths) => widths.reduce((sum, w) => sum + w, 0);
-
-function isFree(page, x0, x1, y0, y1) {
-  return !page.texts.some((t) => t.x < x1 && t.x + t.width > x0 && t.y < y1 && t.y + t.size * 0.8 > y0);
-}
 
 /* ---------- Drawing ---------- */
 
-function drawNote(out, fonts, item, spot, note) {
-  const { regular, bold } = fonts.for(item.label.family);
-  const size = spot.size;
-  const label = "Circ note:";
-  const labelWidth = bold.widthOfTextAtSize(label, size);
-  const valueX = spot.colX + labelWidth + bold.widthOfTextAtSize(" ", size);
-  const value = fitText(regular, size, safeText(regular, note), spot.textRight - valueX);
+// Copies the block's own chunks of the original page into a small form, drawn moved by dy.
+// Settings that draw nothing (line width, colours) are kept in order so lines look as before.
+// When the item's ID is coming out, its ID line is left out here and redrawn by redrawIdLine.
+function drawBlock(out, page, block, dy, chunks, resourcesRef) {
+  const item = block.item;
+  const anchor = (c) => (c.kind === "text" ? c.lines[0].y + c.lines[0].size * 0.3 : (c.box.minY + c.box.maxY) / 2);
+  const isIdLine = (c) => item?.removeId && c.kind === "text" && c.lines.some((l) => Math.abs(l.y - item.line.y) < 1);
+  const mine = chunks.filter((c) => c.kind === "state" || (anchor(c) >= block.clipBottom && anchor(c) <= block.clipTop && !isIdLine(c)));
 
-  out.drawText(label, { x: spot.colX, y: spot.noteY, size, font: bold, color: BLACK });
-  out.drawText(value, { x: valueX, y: spot.noteY, size, font: regular, color: BLACK });
+  const { x, y, width, height } = block.box;
+  const form = out.context.flateStream(Buffer.from(mine.map((c) => c.text).join("\n"), "latin1"), {
+    Type: "XObject",
+    Subtype: "Form",
+    BBox: [x, y, x + width, y + height],
+    Resources: resourcesRef,
+  });
+  const name = page.node.newXObject("Block", out.context.register(form));
+  page.pushOperators(pushGraphicsState(), concatTransformationMatrix(1, 0, 0, 1, 0, round(dy)), drawObject(name), popGraphicsState());
 }
 
-// Draws the bars as vector rectangles. Returns false when there isn't room for a scannable barcode.
-function drawBarcode(out, spot) {
-  const { widths, x, module, top, bottom } = spot.barcode;
+// The item's ID line without "item ID:…": the text after it slides left to close the gap.
+function redrawIdLine(page, fonts, item, dy) {
+  const shift = item.idEnd - item.idStart;
+  for (const run of item.line.items) {
+    if (run === item.run || !run.str.trim()) continue;
+    const { regular } = fonts.for(run.family);
+    const x = run.x >= item.idEnd - 0.5 ? run.x - shift : run.x;
+    page.drawText(safeText(regular, run.str), { x: round(x), y: round(item.line.y + dy), size: round(run.size), font: regular, color: BLACK });
+  }
+}
+
+// Returns true if the note had to be shortened to fit.
+function drawNote(page, fonts, item, dy, note, list) {
+  const { regular, bold } = fonts.for(item.run.family);
+  const size = item.size;
+  const y = item.line.y - list.lineHeight + dy;
+  const label = "Note:";
+  const valueX = item.lineX + bold.widthOfTextAtSize(label + " ", size);
+  const text = safeText(regular, note);
+  const value = fitText(regular, size, text, item.barLeft - BARCODE_GAP - valueX);
+
+  page.drawText(label, { x: round(item.lineX), y: round(y), size: round(size), font: bold, color: BLACK });
+  page.drawText(value, { x: round(valueX), y: round(y), size: round(size), font: regular, color: BLACK });
+  return value !== text;
+}
+
+// Draws the bars as vector rectangles beside the title and ID lines, with the ID's digits
+// centered under them on the added line. Returns false when there isn't room for a barcode that scans.
+function drawBarcode(page, fonts, item, dy, list) {
+  const widths = barcodeWidths(item.id);
+  const module = Math.min(MAX_MODULE, (list.barRight - item.barLeft) / modules(widths));
   if (!(module >= MIN_MODULE)) return false;
 
-  const height = Math.min(Math.max(top - bottom, spot.size * 1.8), 42);
-  let y = top - height;   // hangs from the top of the item's first line
-  if (spot.noteY !== null) y = Math.max(y, spot.noteY + spot.size * 0.9);   // never over this item's note
-  let cursor = x;
+  const barTop = item.barTop + dy;
+  const barBottom = item.line.y - item.size * 0.22 + dy;
+  // All the bars as one filled shape: much smaller in the file than a separate rectangle per bar.
+  const bars = [];
+  let x = item.barLeft;
   widths.forEach((w, i) => {
-    if (i % 2 === 0) out.drawRectangle({ x: cursor, y, width: w * module, height, color: BLACK });
-    cursor += w * module;
+    if (i % 2 === 0) bars.push(rectangle(round(x), round(barBottom), round(w * module), round(barTop - barBottom)));
+    x += w * module;
   });
+  page.pushOperators(pushGraphicsState(), setFillingGrayscaleColor(0), ...bars, fill(), popGraphicsState());
+
+  const barWidth = x - item.barLeft;
+  const { regular } = fonts.for(item.run.family);
+  const digitSize = Math.min(item.size, item.size * barWidth / regular.widthOfTextAtSize(item.id, item.size));
+  const digitsWidth = regular.widthOfTextAtSize(item.id, digitSize);
+  page.drawText(item.id, { x: round(item.barLeft + (barWidth - digitsWidth) / 2), y: round(item.line.y - list.lineHeight + dy), size: round(digitSize), font: regular, color: BLACK });
   return true;
+}
+
+// The original footer's text in its original place, with "Page X of N" updated for the new page count.
+function drawFooter(page, fonts, footer, number, total) {
+  if (!footer) return;
+  for (const run of footer.runs) {
+    const { regular } = fonts.for(run.family);
+    const text = safeText(regular, run.str.replace(PAGE_NUMBER, `Page ${number} of ${total}`));
+    const right = run.x + run.width;   // page numbers stay right-aligned where they were
+    const x = PAGE_NUMBER.test(run.str) ? right - regular.widthOfTextAtSize(text, run.size) : run.x;
+    page.drawText(text, { x: round(x), y: round(run.y), size: round(run.size), font: regular, color: BLACK });
+  }
 }
 
 // Standard PDF fonts matched to the list's own font style; embedded once per document.

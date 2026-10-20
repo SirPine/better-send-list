@@ -168,8 +168,11 @@ function showSummary(summary) {
   if (!summary) return;
   const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
   let text = `${count(summary.items, "item")} found. Added ${count(summary.notes, "circ note")} and ${count(summary.barcodes, "barcode")}.`;
-  if (summary.notesSkipped) text += ` ${count(summary.notesSkipped, "circ note")} didn’t fit on the page.`;
+  if (summary.notesShortened) text += ` ${count(summary.notesShortened, "circ note")} had to be cut short to fit.`;
   if (summary.barcodesSkipped) text += ` ${count(summary.barcodesSkipped, "barcode")} didn’t fit on the page.`;
+  if (summary.pages && summary.originalPages && summary.pages !== summary.originalPages) {
+    text += ` The list is now ${count(summary.pages, "page")} (was ${summary.originalPages}).`;
+  }
   summaryEl.textContent = text;
 }
 

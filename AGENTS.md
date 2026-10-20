@@ -21,9 +21,15 @@ That is the whole job. The PDF already has the title, call number, location and 
 - `src/server.js`: Express app and API routes. It serves `public/` as static files and accepts the PDF upload. It keeps the latest generated list with the session, so a page refresh restores it.
   - **Sign-in checks real accounts** (`POST /api/session`). Every signed-in route also checks that the account still exists and that its password hasn't changed since the session started.
   - **Generating works.** `POST /api/send-list` returns the improved PDF, with counts in the `X-Send-List-Summary` header, or 422 with a message when the file has no item IDs.
-- `src/send-list.js`: builds the improved list. It finds each `ID: <number>` with pdf.js, works out that item's column, line spacing and font, and draws with pdf-lib into empty space, never moving the original text:
-  - **Circ note:** a "Circ note:" line on the row right below the item's ID column. If that row is taken, the note is skipped and counted. An item that already shows a "Circ note:" doesn't get a second one.
-  - **Barcode:** a Code 128 barcode, drawn as vector bars, to the right of the item, from the top of its first line to the bottom of its ID line. On each page, barcodes share one left edge and bar width so they line up. They may use space up to ¼ inch from the paper edge. If there's no room for one that scans, it's skipped and counted.
+- `src/send-list.js`: builds the improved list. The real send list is a **Microsoft Access report** with items packed one after another and no empty line between them (each item ends with a `copy:1  item ID:0000214440471  type:…  location:…` line). So:
+  - **Re-layout by blocks:** the list is cut into blocks: headings, and each item down to its ID line (a block also ends at any gap over 1.4 lines). The blocks are flowed onto fresh pages at **full size, never scaled** (the user's choice; scaling was tried and rejected).
+  - **Only each block's own content is copied:** `src/pdf-content.js` splits a page's content stream into chunks (one text object, one line, or a style setting), each with its position. A block becomes a small form XObject holding just its chunks, plus every style chunk in order. So nothing hidden is left behind, and selecting, copying or searching finds each line once. The item's ID line is left out and redrawn without "item ID:…" (`redrawIdLine`). Pages whose content uses anything not understood (a `cm` transform, XObjects, inline images) fall back to drawing the whole page clipped per block, which does leave hidden text.
+  - **Condensing:** gaps before headings are closed up to at most 1.35 lines, and the blank space after each item to 0.6 lines. The Access report's page break per location group is dropped. A heading is never left at the bottom of a page without what follows it. On the real list this keeps 17 pages even with the added lines.
+  - **Footers:** the report's footer (detected by "Page X of N", or as a bottom line set well apart) is dropped from the blocks and redrawn on every new page with the date and a correct "Page X of N".
+  - **Circ note:** labeled "Note: …" (the user's wording) on the added line, starting under "copy:". It's cut short with "…" only if it would run into the barcode.
+  - **Item ID moves under the barcode** (the user's choice): "item ID:…" is removed from the ID line by drawing that band in two pieces, with the part after the ID slid left to close the gap. The ID's digits are printed centered under the barcode on the added line. This is skipped (the ID stays in the line) if other text shares that band.
+  - **Barcode:** Code 128 vector bars to the right of the title line and the ID line. **Every barcode has the same left edge on every page** (the user asked for this); only if that would make some barcode too narrow to scan does each start after its own item's text. All 127 barcodes on the real 17-page list decode at 300 dpi; at 150 dpi a few narrow ones on crowded pages don't, so check at print resolution.
+  - **Checking output:** render pages to look at them, and use `pdftotext` to confirm the text layer: each item ID should appear exactly once (under its barcode), with no "item ID:" and one footer per page.
   - **Already processed:** the output PDF gets a `better-send-list:processed` keyword, and uploading such a file again is refused with a message.
 - `src/circ-notes.js`: **temporary.** It reads notes from `data/circ-notes.json` (item ID → note). Replace `getCircNotes` with the Symphony lookup and keep its shape: item IDs in, a `Map` of ID → note out.
 - `src/users.js`: accounts in SQLite (`node:sqlite`, file `data/users.db` or `DB_PATH`). Passwords are salted and hashed with scrypt (N=2^17, r=8, p=1); the stored string carries its parameters. Unknown user IDs are checked against a stand-in hash so they take as long as wrong passwords.
@@ -48,8 +54,8 @@ That is the whole job. The PDF already has the title, call number, location and 
 
 ## Testing without real data
 
-- `samples/sample-send-list.pdf` is a made-up two-page list in the layout from the user's proof of concept. Six of its items have notes in `data/circ-notes.json`. Regenerate it with `npm run sample`.
-- The layout was built against that sample, **not a real WorkFlows export**. When the user provides a real send list (with patron data removed), test against it first; the "ID:" matching and the row and column detection in `src/send-list.js` are what might need adjusting.
+- `samples/sample-send-list.pdf` is a made-up two-page list that mimics the real Access report layout. Six of its items have notes in `data/circ-notes.json`. Regenerate it with `npm run sample`.
+- The layout was checked against a real 17-page, 127-item export (not in the repo; it holds real library data). Never commit real send lists.
 - Check barcodes by decoding a rendered page, not just by looking at it.
 
 ## UI decisions to keep
