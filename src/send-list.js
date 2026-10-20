@@ -1,6 +1,6 @@
 const path = require("node:path");
 const {
-  PDFDocument, PDFObjectCopier, StandardFonts, rgb,
+  PDFDocument, PDFObjectCopier, PDFDict, PDFName, StandardFonts, rgb,
   pushGraphicsState, popGraphicsState, concatTransformationMatrix, drawObject, rectangle, clip, endPath, fill, setFillingGrayscaleColor,
 } = require("pdf-lib");
 const bwipjs = require("bwip-js");
@@ -21,8 +21,8 @@ const { pageContent, chunkContent } = require("./pdf-content");
    new page. So the list is cut into blocks (headings, and each item down to its ID line),
    and the blocks are flowed onto fresh pages at full size: big gaps are closed up, a
    heading is never left alone at the bottom of a page, and each page gets a new footer
-   with the report's date and a correct "Page X of N". Every barcode sits at the same
-   distance from the left edge on every page. */
+   with the report's date and a correct "Page X of N". Every barcode starts at the same
+   spot (BARCODE_LEFT) on every page of every list. */
 
 const ID_LABEL = /(?:^|\s)ID:\s*(\d{8,})?/;   // "ID:" with the number in the same text run, or…
 const LEADING_DIGITS = /^\s*(\d{8,})/;         // …the number as the next run on the line
@@ -33,7 +33,11 @@ const FOOTER_GAP = 8;                          // keep the content at least this
 const MAX_GAP_LINES = 1.35;                    // gaps before headings are closed up to at most this many lines…
 const ITEM_GAP_LINES = 0.6;                    // …and the blank space after each item to this much
 const BARCODE_GAP = 12;                        // space each side of a barcode (≥ the scanner's quiet zone)
+const BARCODE_LEFT = 416;                      // where every barcode starts, in points from the page's left edge
+                                               // (just right of the widest item text on the real list, 404pt)
 const MAX_MODULE = 1.0;                        // widest bar unit, in points
+const PRINTER_DOT = 72 / 300;                  // bars and barcode edges snap to 300-dpi dots (also exact at 600 dpi),
+                                               // so printers don't round some bars a dot wider than others
 const MIN_MODULE = 0.55;                       // narrowest that still scans reliably when printed
 const BLACK = rgb(0, 0, 0);
 
@@ -61,6 +65,9 @@ async function buildSendList(pdfBytes, getCircNotes) {
   }
 
   const pages = await readPages(pdfBytes);
+  // pdf.js only guesses a font's style (it calls embedded Times "sans-serif"), so go by the fonts' real names.
+  const family = documentFamily(source);
+  if (family) for (const page of pages) for (const t of page.texts) t.family = family;
   const list = analyse(pages, source.getPages().map((p) => p.getMediaBox()));
   if (list.items.length === 0) {
     throw new SendListError("No item IDs were found in this PDF. Upload a send list exported from WorkFlows.");
@@ -95,7 +102,7 @@ async function buildSendList(pdfBytes, getCircNotes) {
     for (const { block, dy } of placed) {
       const chunks = content[block.page];
       if (chunks) {
-        drawBlock(out, page, block, dy, chunks, resourcesOf(block.page));
+        drawBlock(out, page, block, dy, chunks, resourcesOf(block.page), list.dropped);
         if (block.item?.removeId) redrawIdLine(page, fonts, block.item, dy);
       } else {
         const from = await original(block.page);
@@ -128,6 +135,26 @@ async function buildSendList(pdfBytes, getCircNotes) {
 }
 
 /* ---------- Reading the text and where it sits ---------- */
+
+// "serif", "sans-serif" or "monospace", from the names of the fonts the list uses (most common wins).
+function documentFamily(doc) {
+  const votes = { serif: 0, "sans-serif": 0, monospace: 0 };
+  const seen = new Set();
+  for (const page of doc.getPages()) {
+    const fonts = page.node.Resources()?.lookupMaybe(PDFName.of("Font"), PDFDict);
+    for (const [, ref] of fonts?.entries() ?? []) {
+      const font = doc.context.lookup(ref, PDFDict);
+      const name = String(font.get(PDFName.of("BaseFont")) ?? "").replace(/^\/([A-Z]{6}\+)?/, "");
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      if (/courier|mono|consol/i.test(name)) votes.monospace++;
+      else if (/sans|arial|helvetica|calibri|verdana|tahoma|segoe|gothic/i.test(name)) votes["sans-serif"]++;
+      else if (/times|roman|serif|georgia|garamond|cambria|palatino|century|book/i.test(name)) votes.serif++;
+    }
+  }
+  const [best, count] = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+  return count ? best : null;
+}
 
 async function readPages(pdfBytes) {
   const pdfjs = await loadPdfjs();
@@ -205,6 +232,8 @@ function analyse(pages, boxes) {
   const items = [];
   let footer = null;
   let topLimit = Infinity;
+  const dropped = [];   // lines left out (stray letters, repeated headings), so their content chunks are skipped too
+  let previousHeading = null;   // the last line, if it was a heading, for spotting a repeat right after it
 
   pages.forEach((page, p) => {
     const box = boxes[p];
@@ -217,7 +246,24 @@ function analyse(pages, boxes) {
     const isFooter = Boolean(last && !itemOn(last) &&
       (last.items.some((t) => PAGE_NUMBER.test(t.str)) || (aboveLast && aboveLast.y - last.y > lineHeight * 3)));
     if (isFooter) footer ??= last;
-    const content = isFooter ? lines.slice(0, -1) : lines;
+    // A line that's just one stray letter (the report prints a lone "T" in its header) is left out.
+    // Left out: a line that's just one stray letter (the report prints a lone "T" in its header),
+    // and a heading that repeats the heading right before it (the report prints each location
+    // twice, large then smaller; the first is kept).
+    const textOf = (line) => line.items.map((t) => t.str).join(" ").replace(/\s+/g, " ").trim().toLowerCase();
+    const isHeading = (line) => line.size >= size * 1.15;
+    const leaveOut = (line) => {
+      if (line.items.length === 1 && /^[A-Za-z]$/.test(line.items[0].str.trim())) return true;
+      const repeat = isHeading(line) && previousHeading !== null && textOf(line) === previousHeading;
+      previousHeading = isHeading(line) ? textOf(line) : null;
+      return repeat;
+    };
+    const kept = [];
+    for (const line of isFooter ? lines.slice(0, -1) : lines) {
+      if (!leaveOut(line)) { kept.push(line); continue; }
+      dropped.push({ page: p, x0: Math.min(...line.items.map((t) => t.x)), x1: Math.max(...line.items.map((t) => t.x + t.width)), y: line.y, size: line.size });
+    }
+    const content = kept;
     if (!content.length) return;
     if (topLimit === Infinity) topLimit = content[0].top;   // pages start where the report's first page does
 
@@ -246,10 +292,18 @@ function analyse(pages, boxes) {
     blocks.push(...pageBlocks);
   });
 
+  // How close the report sets a heading above an item's first line (measured where they share a block).
+  const headingGaps = blocks.flatMap((b) => b.lines.slice(1).map((line, i) => [b.lines[i], line]))
+    .filter(([above, below]) => above.size >= size * 1.15 && below.size < size * 1.15)
+    .map(([above, below]) => above.bottom - below.top)
+    .filter((g) => g >= 0)
+    .sort((a, b) => a - b);
+  const headingGap = headingGaps.length ? headingGaps[Math.floor(headingGaps.length / 2)] : null;
+
   const box = boxes[0];
   const footerTop = footer ? footer.top : null;
   return {
-    blocks, items, lineHeight, box,
+    blocks, items, lineHeight, box, dropped, headingGap, headingSize: size * 1.15,
     footer: footer && { runs: footer.items },
     topLimit: Math.min(topLimit, box.y + box.height - PRINT_MARGIN),
     bottomLimit: footerTop !== null ? footerTop + FOOTER_GAP : box.y + PRINT_MARGIN,
@@ -308,17 +362,32 @@ function measureLineHeight(pages, ids, size) {
 // Returns pages of { block, dy }, where dy moves the block from its place on the original page.
 function paginate(list) {
   const { blocks, lineHeight, topLimit, bottomLimit } = list;
-  const maxGap = (prev) => lineHeight * (prev?.item ? ITEM_GAP_LINES : MAX_GAP_LINES);
+  const itemGap = lineHeight * ITEM_GAP_LINES;
+  const sectionGap = lineHeight * MAX_GAP_LINES;
+  const startsWithHeading = (b) => b.lines[0].size >= list.headingSize;
   const height = (b) => b.top - b.bottom + (b.item ? lineHeight : 0);   // items get one added line
-  const gapBefore = (b, prev) => (prev && prev.page === b.page ? Math.min(prev.bottom - b.top, maxGap(prev)) : maxGap(prev));
+  // Even spacing: a section gap before every heading, the report's own snug gap from a heading
+  // to its first item, and the tightened item gap between items.
+  const gapBefore = (b, prev) => {
+    const original = prev && prev.page === b.page ? prev.bottom - b.top : Infinity;
+    if (startsWithHeading(b)) return Math.min(original, sectionGap);
+    if (!prev?.item && list.headingGap !== null) return list.headingGap;
+    return Math.min(original, prev?.item ? itemGap : sectionGap);
+  };
 
   const pages = [[]];
   let y = topLimit;
   blocks.forEach((block, i) => {
     let gap = pages.at(-1).length ? gapBefore(block, blocks[i - 1]) : 0;
     let need = gap + height(block);
-    const next = blocks[i + 1];
-    if (!block.item && next) need += gapBefore(next, block) + height(next);   // keep a heading with what follows it
+    // A heading must have room below it, on the same page, for any headings right after it
+    // and at least the first item that follows them.
+    if (!block.item) {
+      for (let k = i + 1, before = block; k < blocks.length; before = blocks[k++]) {
+        need += gapBefore(blocks[k], before) + height(blocks[k]);
+        if (blocks[k].item) break;
+      }
+    }
     if (pages.at(-1).length && y - need < bottomLimit) {
       pages.push([]);
       y = topLimit;
@@ -331,13 +400,12 @@ function paginate(list) {
   return pages;
 }
 
-// Every barcode starts at the same distance from the left edge, right of the widest item text.
-// If that would leave any barcode too narrow to scan, each starts after its own item's text instead.
+// Every barcode starts at the same spot on every page of every list: BARCODE_LEFT from the left
+// edge. Only an item whose text reaches into that spot has its barcode start after its own text
+// instead (narrower, or left out if it would be too narrow to scan).
 function placeBarcodes(list) {
-  const own = (item) => item.textRight + BARCODE_GAP;
-  const shared = Math.max(...list.items.map(own));
-  const fits = list.items.every((item) => (list.barRight - shared) / modules(barcodeWidths(item.id)) >= MIN_MODULE);
-  for (const item of list.items) item.barLeft = fits ? shared : own(item);
+  const fixed = list.box.x + BARCODE_LEFT;
+  for (const item of list.items) item.barLeft = Math.max(fixed, item.textRight + BARCODE_GAP);
 }
 
 const round = (n) => Math.round(n * 1000) / 1000;   // 1/1000 pt is far finer than any printer
@@ -350,11 +418,15 @@ const modules = (widths) => widths.reduce((sum, w) => sum + w, 0);
 // Copies the block's own chunks of the original page into a small form, drawn moved by dy.
 // Settings that draw nothing (line width, colours) are kept in order so lines look as before.
 // When the item's ID is coming out, its ID line is left out here and redrawn by redrawIdLine.
-function drawBlock(out, page, block, dy, chunks, resourcesRef) {
+function drawBlock(out, page, block, dy, chunks, resourcesRef, dropped) {
   const item = block.item;
   const anchor = (c) => (c.kind === "text" ? c.lines[0].y + c.lines[0].size * 0.3 : (c.box.minY + c.box.maxY) / 2);
   const isIdLine = (c) => item?.removeId && c.kind === "text" && c.lines.some((l) => Math.abs(l.y - item.line.y) < 1);
-  const mine = chunks.filter((c) => c.kind === "state" || (anchor(c) >= block.clipBottom && anchor(c) <= block.clipTop && !isIdLine(c)));
+  // A left-out line's text, and its underline (a line or bar just under its baseline, within its width).
+  const isDropped = (c) => dropped.some((d) => d.page === block.page && (c.kind === "text"
+    ? c.lines.every((l) => Math.abs(l.y - d.y) < 1 && l.x >= d.x0 - 1 && l.x <= d.x1)
+    : c.box.minX >= d.x0 - 2 && c.box.maxX <= d.x1 + 2 && c.box.maxY <= d.y + 1 && c.box.minY >= d.y - d.size * 0.45));
+  const mine = chunks.filter((c) => c.kind === "state" || (anchor(c) >= block.clipBottom && anchor(c) <= block.clipTop && !isIdLine(c) && !isDropped(c)));
 
   const { x, y, width, height } = block.box;
   const form = out.context.flateStream(Buffer.from(mine.map((c) => c.text).join("\n"), "latin1"), {
@@ -397,25 +469,26 @@ function drawNote(page, fonts, item, dy, note, list) {
 // centered under them on the added line. Returns false when there isn't room for a barcode that scans.
 function drawBarcode(page, fonts, item, dy, list) {
   const widths = barcodeWidths(item.id);
-  const module = Math.min(MAX_MODULE, (list.barRight - item.barLeft) / modules(widths));
+  const left = Math.ceil(item.barLeft / PRINTER_DOT) * PRINTER_DOT;
+  const module = Math.floor(Math.min(MAX_MODULE, (list.barRight - left) / modules(widths)) / PRINTER_DOT) * PRINTER_DOT;
   if (!(module >= MIN_MODULE)) return false;
 
   const barTop = item.barTop + dy;
   const barBottom = item.line.y - item.size * 0.22 + dy;
   // All the bars as one filled shape: much smaller in the file than a separate rectangle per bar.
   const bars = [];
-  let x = item.barLeft;
+  let x = left;
   widths.forEach((w, i) => {
     if (i % 2 === 0) bars.push(rectangle(round(x), round(barBottom), round(w * module), round(barTop - barBottom)));
     x += w * module;
   });
   page.pushOperators(pushGraphicsState(), setFillingGrayscaleColor(0), ...bars, fill(), popGraphicsState());
 
-  const barWidth = x - item.barLeft;
+  const barWidth = x - left;
   const { regular } = fonts.for(item.run.family);
   const digitSize = Math.min(item.size, item.size * barWidth / regular.widthOfTextAtSize(item.id, item.size));
   const digitsWidth = regular.widthOfTextAtSize(item.id, digitSize);
-  page.drawText(item.id, { x: round(item.barLeft + (barWidth - digitsWidth) / 2), y: round(item.line.y - list.lineHeight + dy), size: round(digitSize), font: regular, color: BLACK });
+  page.drawText(item.id, { x: round(left + (barWidth - digitsWidth) / 2), y: round(item.line.y - list.lineHeight + dy), size: round(digitSize), font: regular, color: BLACK });
   return true;
 }
 
