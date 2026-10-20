@@ -1,2 +1,6 @@
 node_modules/
 .env
+
+# Account database: never commit (password hashes)
+data/*.db
+data/*.db-*

@@ -15,6 +15,7 @@ const userEl = $("wf-user"), passEl = $("wf-pass"), statusEl = $("wf-status"), s
 const dropzone = $("dropzone"), fileInput = $("file-input"), fileError = $("file-error");
 const fileChip = $("file-chip"), fileNameEl = $("file-name"), fileMetaEl = $("file-meta");
 const generateError = $("generate-error"), generateErrorText = $("generate-error-text"), loadingEl = $("loading");
+const summaryEl = $("result-summary");
 const printBtn = $("print-btn"), downloadBtn = $("download-btn");
 const toolbar = $("toolbar"), viewport = $("viewport"), pagesEl = $("pages"), emptyEl = $("empty"), emptyText = $("empty-text");
 const pageInput = $("page-input"), pageCount = $("page-count"), zoomSelect = $("zoom-select");
@@ -69,13 +70,17 @@ $("signin-form").addEventListener("submit", async (e) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId: userEl.value.trim(), password: passEl.value }),
     });
-    if (!res.ok) throw new Error(res.status === 401 ? "Invalid user ID or password." : "Couldn’t reach WorkFlows.");
+    if (res.status === 401 || res.status === 429) {
+      const { error } = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(error || "Invalid user ID or password."), { shown: true });
+    }
+    if (!res.ok) throw new Error();
     const { userId } = await res.json();
     passEl.value = "";   // the server keeps the session; the password isn't needed again
     setStatus("");
     showView(userId);
   } catch (e) {
-    setStatus(e.message.startsWith("Invalid") || e.message.startsWith("Couldn’t") ? e.message : "Couldn’t reach the server.", "err");
+    setStatus(e.shown ? e.message : "Couldn’t reach the server. Try again in a moment.", "err");
   } finally {
     signinBtn.disabled = false;
   }
@@ -134,6 +139,7 @@ function clearFile() {
   dropzone.hidden = false;
   fileError.hidden = true;
   generateError.hidden = true;
+  showSummary(null);
   generateToken++;
   setLoading(false);
   clearPreview();
@@ -150,15 +156,27 @@ $("remove-file").addEventListener("click", () => {
   clearFile();
 });
 
-/* ---------- Generate (calls your backend) ---------- */
+/* ---------- Generate (calls the server) ---------- */
 function setLoading(on) {
   loadingEl.hidden = !on;
   if (on) emptyEl.hidden = true;
 }
 
+// e.g. "12 items found. Added 6 circ notes and 12 barcodes."
+function showSummary(summary) {
+  summaryEl.hidden = !summary;
+  if (!summary) return;
+  const count = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  let text = `${count(summary.items, "item")} found. Added ${count(summary.notes, "circ note")} and ${count(summary.barcodes, "barcode")}.`;
+  if (summary.notesSkipped) text += ` ${count(summary.notesSkipped, "circ note")} didn’t fit on the page.`;
+  if (summary.barcodesSkipped) text += ` ${count(summary.barcodesSkipped, "barcode")} didn’t fit on the page.`;
+  summaryEl.textContent = text;
+}
+
 async function generate() {
   const token = ++generateToken;
   generateError.hidden = true;
+  showSummary(null);
   clearPreview();
   setLoading(true);
   try {
@@ -167,16 +185,25 @@ async function generate() {
     form.append("pageCount", String(uploadedPages));
     const res = await fetch(API.sendList, { method: "POST", body: form });
     if (res.status === 401) { if (token === generateToken) sessionExpired(); return; }
+    if (res.status === 422) {   // the file isn't a usable send list; trying again won't help
+      const { error } = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(error || "This PDF couldn’t be used as a send list."), { retry: false });
+    }
     if (!res.ok) throw new Error();
+    let summary = null;
+    try { summary = JSON.parse(res.headers.get("X-Send-List-Summary")); } catch { /* shown without a summary */ }
     const blob = await res.blob();
     if (token !== generateToken) return;   // file was removed or replaced meanwhile
     setLoading(false);
+    showSummary(summary);
     await loadPreview(blob);
-  } catch {
+  } catch (err) {
     if (token !== generateToken) return;
     setLoading(false);
     clearPreview("The send list couldn’t be generated.");
-    generateErrorText.textContent = "Couldn’t generate the send list. Check your connection and try again.";
+    const known = err.retry === false;
+    generateErrorText.textContent = known ? err.message : "Couldn’t generate the send list. Check your connection and try again.";
+    $("retry-btn").hidden = known;
     generateError.hidden = false;
   }
 }
@@ -356,9 +383,10 @@ updateNavButtons(1);
   if (session?.sendList) restoreSendList(session.sendList);
 })();
 
-async function restoreSendList({ fileName, fileSize, pageCount }) {
+async function restoreSendList({ fileName, fileSize, pageCount, summary }) {
   const token = ++generateToken;
   showFileChip(fileName, fileSize, pageCount);
+  showSummary(summary);
   clearPreview();
   setLoading(true);
   try {

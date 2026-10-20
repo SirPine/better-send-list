@@ -140,6 +140,7 @@ h1 { font-size: 36px; line-height: 1.1; letter-spacing: -0.03em; font-weight: 70
 .file-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-meta { font-size: 13px; color: var(--muted); }
 .error-msg { color: var(--danger); font-size: 14px; font-weight: 500; margin: 0; }
+.result-summary { color: var(--muted); font-size: 14px; margin: 0; }
 [hidden] { display: none !important; }
 
 

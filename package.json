@@ -4,8 +4,10 @@
   "description": "Improve the send list at The Honorable Shirley Chisholm Library.",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
+    "sample": "node scripts/make-sample-send-list.js",
+    "users": "node --no-warnings=ExperimentalWarning scripts/users.js"
   },
   "repository": {
     "type": "git",
@@ -20,10 +22,13 @@
   },
   "homepage": "https://github.com/SirPine/better-send-list#readme",
   "dependencies": {
+    "bwip-js": "^4.11.4",
     "express": "^5.3.0",
-    "multer": "^2.4.0"
+    "multer": "^2.4.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.4.299"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   }
 }

@@ -6,7 +6,7 @@ const crypto = require("node:crypto");
 const SESSION_COOKIE = "sid";
 const SESSION_IDLE_MS = 8 * 60 * 60 * 1000; // a session ends after 8 hours without use
 
-const sessions = new Map(); // id -> { id, userId, expiresAt, sendList, sendListSeq }
+const sessions = new Map(); // id -> { id, userId, createdAt, expiresAt, sendList, sendListSeq }
 
 function readCookie(req, name) {
   for (const part of (req.headers.cookie || "").split(";")) {
@@ -49,7 +49,8 @@ function requireSession(req, res, next) {
 
 function createSession(res, userId) {
   const id = crypto.randomBytes(32).toString("base64url");
-  sessions.set(id, { id, userId, expiresAt: Date.now() + SESSION_IDLE_MS, sendList: null, sendListSeq: 0 });
+  const now = Date.now();
+  sessions.set(id, { id, userId, createdAt: now, expiresAt: now + SESSION_IDLE_MS, sendList: null, sendListSeq: 0 });
   setSessionCookie(res, id);
 }
 
