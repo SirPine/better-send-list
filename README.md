@@ -48,14 +48,11 @@ src/
   sessions.js      in-memory sessions and cookie helpers
 data/
   circ-notes.json  temporary circ notes by item ID, until Symphony is connected
-samples/
-  sample-send-list.pdf   made-up send list for testing (npm run sample rebuilds it)
 scripts/
   users.js         the account admin tool (npm run users)
-  make-sample-send-list.js
 AGENTS.md          goal, status and decisions, for people and AI agents
 ```
 
-To try it, sign in and upload `samples/sample-send-list.pdf`. To change a note, edit `data/circ-notes.json`; the next upload picks it up without a restart.
+To try it, sign in and upload a send list. To change a note, edit `data/circ-notes.json`; the next upload picks it up without a restart.
 
 Changes in `public/` show up on a browser refresh. Changes in `src/` need a server restart, which `npm run dev` does for you (restarting signs everyone out).

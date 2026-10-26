@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node --no-warnings=ExperimentalWarning src/server.js",
     "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
-    "sample": "node scripts/make-sample-send-list.js",
     "users": "node --no-warnings=ExperimentalWarning scripts/users.js"
   },
   "repository": {

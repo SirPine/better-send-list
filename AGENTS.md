@@ -57,7 +57,6 @@ That is the whole job. The PDF already has the title, call number, location and 
 
 ## Testing without real data
 
-- `samples/sample-send-list.pdf` is a made-up two-page list that mimics the real Access report layout. Six of its items have notes in `data/circ-notes.json`. Regenerate it with `npm run sample`.
 - The layout was checked against a real 17-page, 127-item export (not in the repo; it holds real library data). Never commit real send lists.
 - Check barcodes by decoding a rendered page, not just by looking at it.
 
