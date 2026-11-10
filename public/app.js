@@ -130,6 +130,10 @@ async function generate() {
       const { error } = await res.json().catch(() => ({}));
       throw Object.assign(new Error(error || "This PDF couldn’t be used as a send list."), { retry: false });
     }
+    if (res.status === 503) {   // busy with other lists; trying again shortly will work
+      const { error } = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(error || "The server is busy. Try again in a moment."), { shown: true });
+    }
     if (!res.ok) throw new Error();
     let summary = null;
     try { summary = JSON.parse(res.headers.get("X-Send-List-Summary")); } catch { /* shown without a summary */ }
@@ -143,7 +147,7 @@ async function generate() {
     setLoading(false);
     clearPreview("The send list couldn’t be generated.");
     const known = err.retry === false;
-    generateErrorText.textContent = known ? err.message : "Couldn’t generate the send list. Check your connection and try again.";
+    generateErrorText.textContent = known || err.shown ? err.message : "Couldn’t generate the send list. Check your connection and try again.";
     $("retry-btn").hidden = known;
     generateError.hidden = false;
   }

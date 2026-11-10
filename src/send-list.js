@@ -28,6 +28,8 @@ const ID_LABEL = /(?:^|\s)ID:\s*(\d{8,})?/;   // "ID:" with the number in the sa
 const LEADING_DIGITS = /^\s*(\d{8,})/;         // …the number as the next run on the line
 const PAGE_NUMBER = /Page\s+\d+\s+of\s+\d+/i;
 const PROCESSED_MARK = "better-send-list:processed";   // keyword stamped on lists this tool has already done
+const MAX_PAGES = 100;                         // a real send list is ~17 pages; more is refused before any work
+const MAX_ITEMS = 2000;                        // …and ~127 items
 const PRINT_MARGIN = 18;                       // keep additions ¼ inch from the paper edge, which every printer can print
 const FOOTER_GAP = 8;                          // keep the content at least this far above the page footer
 const MAX_GAP_LINES = 1.35;                    // gaps before headings are closed up to at most this many lines…
@@ -63,6 +65,9 @@ async function buildSendList(pdfBytes, getCircNotes) {
   if ((source.getKeywords() ?? "").includes(PROCESSED_MARK)) {
     throw new SendListError("This send list already has circ notes and barcodes added. Upload the original from WorkFlows.");
   }
+  if (source.getPageCount() > MAX_PAGES) {
+    throw new SendListError(`This PDF has ${source.getPageCount()} pages. A send list can have at most ${MAX_PAGES}.`);
+  }
 
   const pages = await readPages(pdfBytes);
   // pdf.js only guesses a font's style (it calls embedded Times "sans-serif"), so go by the fonts' real names.
@@ -71,6 +76,9 @@ async function buildSendList(pdfBytes, getCircNotes) {
   const list = analyse(pages, source.getPages().map((p) => p.getMediaBox()));
   if (list.items.length === 0) {
     throw new SendListError("No item IDs were found in this PDF. Upload a send list exported from WorkFlows.");
+  }
+  if (list.items.length > MAX_ITEMS) {
+    throw new SendListError(`This PDF has ${list.items.length} items. A send list can have at most ${MAX_ITEMS}.`);
   }
   const notes = await getCircNotes([...new Set(list.items.map((item) => item.id))]);
 
