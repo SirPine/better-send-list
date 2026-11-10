@@ -18,7 +18,7 @@ That is the whole job. The PDF already has the title, call number, location and 
 
 ## Current state
 
-- `src/server.js`: Express app and API routes. It serves `public/` as static files and accepts the PDF upload. **There is no sign-in** (the user removed it; library IT hosts the app). It keeps the latest generated list with an anonymous session, so a page refresh restores it (`GET /api/send-list/info`, then `GET /api/send-list`).
+- `src/server.js`: Express app and API routes. It serves `public/` as static files and accepts the PDF upload. **There is no sign-in** (the user removed it; library IT hosts the app). It keeps the latest generated list with an anonymous session for **8 hours after it was generated** (the user's choice; using the page doesn't extend it), so a page refresh restores it (`GET /api/send-list/info`, then `GET /api/send-list`).
   - **Generating works.** `POST /api/send-list` returns the improved PDF, with counts in the `X-Send-List-Summary` header, or 422 with a message when the file has no item IDs.
 - `src/send-list.js`: builds the improved list. The real send list is a **Microsoft Access report** with items packed one after another and no empty line between them (each item ends with a `copy:1  item ID:0000214440471  type:…  location:…` line). So:
   - **Re-layout by blocks:** the list is cut into blocks: headings, and each item down to its ID line (a block also ends at any gap over 1.4 lines). The blocks are flowed onto fresh pages at **full size, never scaled** (the user's choice; scaling was tried and rejected).

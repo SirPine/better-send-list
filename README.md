@@ -26,7 +26,7 @@ src/
   server.js        Express app and API routes
   send-list.js     adds circ notes and item-ID barcodes to the uploaded PDF
   circ-notes.js    looks up circ notes (temporary: reads data/circ-notes.json)
-  sessions.js      in-memory sessions that keep the last list across a refresh
+  sessions.js      in-memory sessions that keep the last list for 8 hours
 data/
   circ-notes.json  temporary circ notes by item ID, until Symphony is connected
 AGENTS.md          goal, status and decisions, for people and AI agents

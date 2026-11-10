@@ -14,14 +14,22 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 /* ---------- Send list ----------
-   The latest generated send list is kept with the session, so it survives a page
-   refresh and is dropped when the session ends. */
+   The latest generated send list is kept with the session for 8 hours after it was
+   generated, so it survives a page refresh. Using the page doesn't extend that. */
+
+const SEND_LIST_KEEP_MS = 8 * 60 * 60 * 1000;
 
 app.use("/api", useSession);
 
+// The session's saved send list, or null once it's 8 hours old (it's dropped then).
+function savedList(session) {
+  if (session.sendList && Date.now() - session.sendList.savedAt >= SEND_LIST_KEEP_MS) session.sendList = null;
+  return session.sendList;
+}
+
 // The saved send list's details: 200 { fileName, fileSize, pageCount, summary } or 404.
 app.get("/api/send-list/info", (req, res) => {
-  const list = req.session.sendList;
+  const list = savedList(req.session);
   if (!list) return res.status(404).json({ error: "No saved send list." });
   res.json({ fileName: list.fileName, fileSize: list.fileSize, pageCount: list.pageCount, summary: list.summary });
 });
@@ -53,6 +61,7 @@ app.post("/api/send-list", upload.single("file"), async (req, res) => {
       pageCount: Number.parseInt(req.body.pageCount, 10) || null,
       summary: result.summary,
       pdf: result.pdf,
+      savedAt: Date.now(),
     };
   }
   res.set("X-Send-List-Summary", JSON.stringify(result.summary));
@@ -61,8 +70,9 @@ app.post("/api/send-list", upload.single("file"), async (req, res) => {
 
 // The saved send list PDF, or 404 if there isn't one.
 app.get("/api/send-list", (req, res) => {
-  if (!req.session.sendList) return res.status(404).json({ error: "No saved send list." });
-  sendPdf(res, req.session.sendList.pdf);
+  const list = savedList(req.session);
+  if (!list) return res.status(404).json({ error: "No saved send list." });
+  sendPdf(res, list.pdf);
 });
 
 // Remove the saved send list.
