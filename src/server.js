@@ -3,7 +3,7 @@ const express = require("express");
 const multer = require("multer");
 const { useSession, isActive } = require("./sessions");
 const { buildSendList, SendListError } = require("./send-list");
-const { getCircNotes } = require("./circ-notes");
+const { getCircNotes, startNotesImport, NOTES_DIR } = require("./circ-notes");
 
 const PORT = process.env.PORT || 3000;
 const MAX_BYTES = 20 * 1024 * 1024; // matches the client-side limit
@@ -136,4 +136,6 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Send List Builder running at http://localhost:${PORT}`);
+  console.log(`Circ notes: the newest .txt file in ${NOTES_DIR} is imported (checked hourly).`);
+  startNotesImport();
 });

@@ -1,2 +1,8 @@
 node_modules/
 .env
+
+# Circ notes from library IT: real library data, never commit
+data/notes.db
+data/notes.db-*
+data/notes-import/
+ChiAllMat*.txt

@@ -14,7 +14,7 @@ That is the whole job. The PDF already has the title, call number, location and 
 ## What needs the library system and what doesn't
 
 - **Barcodes need no library access.** The item IDs are already printed on the send list. Read them from the PDF and draw the barcode locally. Use Code 128 unless the user says their scanners need something else (Codabar is the other common library format).
-- **Only the circulation notes need Symphony.** That's one lookup per item, by item ID, through SirsiDynix Symphony Web Services (ILSWS).
+- **Only the circulation notes come from Symphony,** and not live: each week library IT drops a text file of every item and its note, which the server imports into SQLite.
 
 ## Current state
 
@@ -34,17 +34,20 @@ That is the whole job. The PDF already has the title, call number, location and 
   - **Barcode:** Code 128 vector bars to the right of the title line and the ID line. **Every barcode starts at the same spot on every page of every list** (the user asked for this): `BARCODE_LEFT`, 416pt from the left edge, where the real list's barcodes sat when they followed its widest item text (404pt, after "item ID:…" is removed). The user chose this spot. Only an item whose text reaches into that space has its barcode start after its own text instead. Bar widths and the barcode's left edge snap to 300-dpi printer dots (0.96pt bars = 4 dots at 300 dpi, 8 at 600), because off-grid bars once caused a misread. All 127 barcodes on the real list decode with no misreads at 200, 300 and 600 dpi. At 150 dpi (screen resolution) some don't, so always check at print resolution and treat any unexpected decode as a failure.
   - **Checking output:** render pages to look at them, and use `pdftotext` to confirm the text layer: each item ID should appear exactly once (under its barcode), with no "item ID:" and one footer per page.
   - **Already processed:** the output PDF gets a `better-send-list:processed` keyword, and uploading such a file again is refused with a message.
-- `src/circ-notes.js`: **temporary.** It reads notes from `data/circ-notes.json` (item ID → note). Replace `getCircNotes` with the Symphony lookup and keep its shape: item IDs in, a `Map` of ID → note out.
+- `src/circ-notes.js`: circ notes in SQLite (`node:sqlite`, `NOTES_DB`, default `data/notes.db`, never committed). Each week IT drops a new pipe-separated export of every item into `NOTES_DIR` (default `data/notes-import/`). The real file (`ChiAllMat.txt`, ~151k lines, 8.5 MB, never commit it) has one line per item: `itemID   |date|date|noteA|noteB|noteC|call number|`. Kept as light as possible (the user's ask):
+  - On startup and then hourly, the newest `.txt` there is checked; if its name, size and modified time match the last import, nothing else happens. A file changed in the last minute is left until it settles (it may still be copying).
+  - Only items **with** a note are stored. The file is streamed a line at a time, written to a fresh table, and swapped in with one transaction, so lookups never see half an import. The real file imports ~24.6k notes in ~0.5 s into a ~1 MB database.
+  - An export with no notes in it (wrong or empty file) is not imported; the old notes stay. A failed import also keeps the old notes. Each import is logged in the `imports` table.
+  - Parsing: the note is the **first two note fields** (4th and 5th) joined with "; ", with empty fields and repeats ("POP|POP") left out. The 6th field (staff comments like ".COMMENT. MISSING INSERT") is left out: the user said it doesn't help find material. IDs are trimmed (they're space-padded) and matched without leading zeros. A line whose first field has no digits is skipped (one real line has `DORA'S PICNIC-RI` as its ID).
+  - `getCircNotes` keeps its shape: item IDs in, a `Map` of ID → note out.
 - `src/sessions.js`: in-memory anonymous sessions (an HttpOnly cookie, 8-hour idle timeout), started on the first API request. They only hold the saved list.
 - `public/`: the front end. `index.html` has the markup (one upload and preview view), `styles.css` the styles, and `app.js` the behavior. It previews with PDF.js.
 - Run it with `npm run dev`, which restarts when files in `src/` change, or `npm start`. It serves http://localhost:3000. Restarting clears all saved lists. Changes in `public/` need only a browser refresh.
 
-## Connecting to Symphony (blocked on library IT)
+## Circ notes from library IT
 
-- The public catalog is SirsiDynix Enterprise, hosted by SirsiDynix at `bepl.ent.sirsi.net`, and reachable from outside the library.
-- The ILSWS base URL and a **client ID** must come from the library system's central IT. They are not known yet. `bepl.sirsi.net` does not exist.
-- **Do not guess hostnames or client IDs or attempt logins against the live system.** Wait for IT to provide them.
-- When they arrive, `src/server.js` uses them to read each item's circ note. How the server signs in to Symphony (for example a dedicated library account held by the server) is not decided yet.
+- There is no live Symphony (ILSWS) connection. Library IT supplies the weekly export file and hosts the app.
+- **Do not guess hostnames or client IDs or attempt logins against the live system.**
 
 ## Sign-in
 

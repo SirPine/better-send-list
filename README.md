@@ -25,13 +25,16 @@ public/            what the browser loads (served as static files)
 src/
   server.js        Express app and API routes
   send-list.js     adds circ notes and item-ID barcodes to the uploaded PDF
-  circ-notes.js    looks up circ notes (temporary: reads data/circ-notes.json)
+  circ-notes.js    imports the weekly circ notes file into SQLite and looks notes up
   sessions.js      in-memory sessions that keep the last list for 8 hours
 data/
-  circ-notes.json  temporary circ notes by item ID, until Symphony is connected
+  notes-import/    put the weekly circ notes .txt file from IT here (not in git)
+  notes.db         the imported notes (SQLite, not in git)
 AGENTS.md          goal, status and decisions, for people and AI agents
 ```
 
-To try it, upload a send list. To change a note, edit `data/circ-notes.json`; the next upload picks it up without a restart.
+To try it, upload a send list.
+
+**Circ notes:** put the weekly export from IT (`ChiAllMat.txt`: one item per line, its first two note fields joined as its note) in `data/notes-import/`, or the folder named by `NOTES_DIR`. The server imports the newest `.txt` file there on startup and checks for a new one every hour; a restart imports a new file right away. Older files can be deleted.
 
 Changes in `public/` show up on a browser refresh. Changes in `src/` need a server restart, which `npm run dev` does for you (restarting clears everyone's saved list).
