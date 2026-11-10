@@ -124,7 +124,7 @@ async function buildSendList(pdfBytes, getCircNotes) {
 
       const item = block.item;
       if (!item) continue;
-      const note = notes.get(item.id);
+      const note = withoutRepeats(notes.get(item.id), block.lines);
       if (note) {
         if (drawNote(page, fonts, item, dy, note, list)) summary.notesShortened++;
         summary.notes++;
@@ -456,6 +456,19 @@ function redrawIdLine(page, fonts, item, dy) {
     const x = run.x >= item.idEnd - 0.5 ? run.x - shift : run.x;
     page.drawText(safeText(regular, run.str), { x: round(x), y: round(item.line.y + dy), size: round(run.size), font: regular, color: BLACK });
   }
+}
+
+// The note without the parts the item's own lines already show as a whole word or phrase,
+// ignoring case: "ROCK" under call number "ROCK .G118 U" says nothing new. Partial overlaps
+// stay ("NEW AGE file under "Mc"" is kept). Returns "" when nothing is left.
+function withoutRepeats(note, lines) {
+  if (!note) return "";
+  const shown = ` ${lines.flatMap((l) => l.items.map((t) => t.str)).join(" ").replace(/\s+/g, " ").toLowerCase()} `;
+  const isShown = (part) => {
+    const escaped = part.toLowerCase().replace(/\s+/g, " ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`).test(shown);
+  };
+  return note.split("; ").filter((part) => !isShown(part)).join("; ");
 }
 
 // Returns true if the note had to be shortened to fit.

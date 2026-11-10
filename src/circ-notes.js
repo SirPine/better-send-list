@@ -8,13 +8,13 @@ const { DatabaseSync } = require("node:sqlite");
    Each week library IT drops a new text file listing every item into NOTES_DIR
    (default data/notes-import/). One item per line, fields separated by "|":
 
-     0000199161639   |20011127|20250613||Classical "Ba"|booklet missing|CHAMBER .B119 BRA-1|
-     item ID           two dates          three note fields              call number
+     0000138332879   |shelved under QE 521 .O43 1988|VOLCANOES*Ollier, Cliff|
+     item ID          two note fields (the line ends with "|")
 
-   An item's note is its first two note fields joined with "; ", leaving out empty
-   ones and repeats ("POP|POP" gives "POP"). The third holds staff comments
-   (".COMMENT. MISSING INSERT"), which don't help find the item, so it's left out
-   (the user's choice).
+   An item's note is its two note fields joined with "; ", leaving out empty ones
+   and repeats ("POP|POP" gives "POP"). A line of any other shape (such as the
+   older export, with dates and a call number) is skipped, so a file in the wrong
+   format imports nothing and the notes already stored are kept.
 
    On startup and then once an hour the newest .txt file there is checked. If it's
    the one already imported, nothing else happens. Otherwise only the items that
@@ -45,7 +45,8 @@ function normalizeId(id) {
   return id.trim().toUpperCase().replace(/^0+(?=.)/, "");
 }
 
-const NOTE_FIELDS = [3, 4];   // 4th and 5th fields of a line
+const FIELD_COUNT = 4;        // id|note|note| splits into four pieces, the last one empty
+const NOTE_FIELDS = [1, 2];   // 2nd and 3rd fields of a line
 
 // Joins notes with "; ", leaving out repeats (ignoring case).
 function joinNotes(notes) {
@@ -57,7 +58,7 @@ function joinNotes(notes) {
 // One line of the export -> [id, note], or null for a header, a blank line or an item without a note.
 function parseLine(line) {
   const fields = line.replace(/^﻿/, "").split("|");
-  if (fields.length <= Math.max(...NOTE_FIELDS)) return null;
+  if (fields.length !== FIELD_COUNT) return null;
   const id = fields[0].trim();
   if (!/\d/.test(id)) return null;
   const note = joinNotes(NOTE_FIELDS.map((i) => fields[i].replace(/\s+/g, " ").trim()).filter(Boolean));
