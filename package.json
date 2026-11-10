@@ -5,8 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node --no-warnings=ExperimentalWarning src/server.js",
-    "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
-    "users": "node --no-warnings=ExperimentalWarning scripts/users.js"
+    "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js"
   },
   "repository": {
     "type": "git",

@@ -26,37 +26,13 @@
         <div class="brand-sub">Send List Builder</div>
       </div>
     </div>
-    <div class="header-account" id="header-account" hidden>
-      <span><span class="account-label">Signed in as </span><strong id="signed-in-user"></strong></span>
-      <button class="header-signout" id="signout-btn" type="button">Sign out</button>
-    </div>
+    <button class="link header-help" type="button" data-help aria-haspopup="dialog">Need help?</button>
   </div>
 </header>
 
 <main class="container">
-  <!-- View 1: WorkFlows sign-in -->
-  <section class="signin-view" id="signin-view" hidden>
-    <form class="card signin-card" id="signin-form" aria-labelledby="wf-title" novalidate>
-      <div>
-        <h2 class="card-title" id="wf-title">Sign in</h2>
-        <p class="card-sub">Retrieve circulation notes to assist in finding library material.</p>
-      </div>
-      <div class="field">
-        <label for="wf-user">User ID</label>
-        <input id="wf-user" type="text" autocomplete="username" placeholder="Enter your user ID" />
-      </div>
-      <div class="field">
-        <label for="wf-pass">Password</label>
-        <input id="wf-pass" type="password" autocomplete="current-password" placeholder="Enter your password" />
-      </div>
-      <span class="status" id="wf-status" role="status" aria-live="polite"></span>
-      <button class="btn btn-solid btn-block" id="signin-btn" type="submit">Sign in</button>
-      <div class="signin-help"><button class="link" type="button" data-help aria-haspopup="dialog">Need help?</button></div>
-    </form>
-  </section>
-
-  <!-- View 2: upload and preview -->
-  <div id="build-view" hidden>
+  <!-- Upload and preview -->
+  <div id="build-view">
     <div class="build-side">
       <section class="card" aria-labelledby="pdf-title">
         <div>

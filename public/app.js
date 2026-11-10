@@ -1,7 +1,7 @@
 /* ---------- API endpoints on this server (see src/server.js) ---------- */
 const API = {
-  session:  "/api/session",    // GET -> { userId } if signed in; POST { userId, password } signs in; DELETE signs out
-  sendList: "/api/send-list",  // POST multipart: file, pageCount -> improved PDF; GET the saved one; DELETE removes it
+  sendList: "/api/send-list",           // POST multipart: file, pageCount -> improved PDF; GET the saved one; DELETE removes it
+  sendListInfo: "/api/send-list/info",  // GET -> { fileName, fileSize, pageCount, summary } of the saved one, or 404
 };
 const MAX_BYTES = 20 * 1024 * 1024;
 
@@ -10,8 +10,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 
 /* ---------- Elements ---------- */
 const $ = (id) => document.getElementById(id);
-const signinView = $("signin-view"), buildView = $("build-view");
-const userEl = $("wf-user"), passEl = $("wf-pass"), statusEl = $("wf-status"), signinBtn = $("signin-btn");
 const dropzone = $("dropzone"), fileInput = $("file-input"), fileError = $("file-error");
 const fileChip = $("file-chip"), fileNameEl = $("file-name"), fileMetaEl = $("file-meta");
 const generateError = $("generate-error"), generateErrorText = $("generate-error-text"), loadingEl = $("loading");
@@ -33,66 +31,6 @@ const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 /* ---------- Helpers ---------- */
 const formatSize = (b) => b < 1024 * 1024 ? `${Math.round(b / 1024)} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`;
-const credsFilled = () => userEl.value.trim() !== "" && passEl.value !== "";
-
-function setStatus(text, kind) {
-  statusEl.className = "status " + (kind || "");
-  statusEl.textContent = text;
-}
-
-/* ---------- WorkFlows ---------- */
-function showView(userId) {
-  const signedIn = !!userId;
-  signinView.hidden = signedIn;
-  buildView.hidden = !signedIn;
-  $("header-account").hidden = !signedIn;
-  $("signed-in-user").textContent = signedIn ? userId : "";
-}
-
-// Called when the server says the session is gone (expired, or the server restarted).
-function sessionExpired() {
-  clearFile();
-  showView(null);
-  setStatus("Your session expired. Please sign in again.", "err");
-  passEl.focus();
-}
-
-[userEl, passEl].forEach(el => el.addEventListener("input", () => setStatus("")));
-
-$("signin-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (!credsFilled()) { setStatus("Enter your user ID and password.", "err"); return; }
-  setStatus("Signing in…", "pending");
-  signinBtn.disabled = true;
-  try {
-    const res = await fetch(API.session, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: userEl.value.trim(), password: passEl.value }),
-    });
-    if (res.status === 401 || res.status === 429) {
-      const { error } = await res.json().catch(() => ({}));
-      throw Object.assign(new Error(error || "Invalid user ID or password."), { shown: true });
-    }
-    if (!res.ok) throw new Error();
-    const { userId } = await res.json();
-    passEl.value = "";   // the server keeps the session; the password isn't needed again
-    setStatus("");
-    showView(userId);
-  } catch (e) {
-    setStatus(e.shown ? e.message : "Couldn’t reach the server. Try again in a moment.", "err");
-  } finally {
-    signinBtn.disabled = false;
-  }
-});
-
-$("signout-btn").addEventListener("click", async () => {
-  try { await fetch(API.session, { method: "DELETE" }); } catch { /* signed out locally either way */ }
-  passEl.value = "";
-  clearFile();
-  showView(null);
-  passEl.focus();
-});
 
 /* ---------- Upload & validation ---------- */
 async function isRealPdf(file) {
@@ -187,7 +125,6 @@ async function generate() {
     form.append("file", uploadedFile);
     form.append("pageCount", String(uploadedPages));
     const res = await fetch(API.sendList, { method: "POST", body: form });
-    if (res.status === 401) { if (token === generateToken) sessionExpired(); return; }
     if (res.status === 422) {   // the file isn't a usable send list; trying again won't help
       const { error } = await res.json().catch(() => ({}));
       throw Object.assign(new Error(error || "This PDF couldn’t be used as a send list."), { retry: false });
@@ -374,16 +311,14 @@ helpDialog.addEventListener("click", (e) => { if (e.target === helpDialog) helpD
 /* ---------- Init ---------- */
 updateNavButtons(1);
 
-// Resume an existing session so a refresh doesn't sign the user out,
-// and bring back the send list saved with it.
+// Bring back the send list saved with this browser's session, so a refresh doesn't lose it.
 (async () => {
-  let session = null;
+  let saved = null;
   try {
-    const res = await fetch(API.session);
-    if (res.ok) session = await res.json();
-  } catch { /* server unreachable: show sign-in */ }
-  showView(session?.userId);
-  if (session?.sendList) restoreSendList(session.sendList);
+    const res = await fetch(API.sendListInfo);
+    if (res.ok) saved = await res.json();
+  } catch { /* server unreachable: start with an empty upload */ }
+  if (saved) restoreSendList(saved);
 })();
 
 async function restoreSendList({ fileName, fileSize, pageCount, summary }) {
