@@ -25,6 +25,7 @@ let previewBlob = null;      // the PDF currently shown in the preview
 let pdfDoc = null;
 let scale = 1;               // 1 = 100%
 let fitMode = false;
+let fitMax = Infinity;       // the most fitting may zoom to: 100% when a list opens, no limit after "Fit width"
 let renderToken = 0;
 let generateToken = 0;       // bumped when a new generate starts or the file is removed
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -166,7 +167,8 @@ async function loadPreview(blob) {
   pageCount.textContent = `of ${pdfDoc.numPages}`;
   pageInput.value = "1";
   viewport.scrollTop = 0;
-  await fitWidth();   // open filling the preview's width, however wide the window is
+  fitMax = 1;         // open fitted to the preview's width, but no bigger than 100%, so more of the list shows
+  await fitWidth();
 }
 
 function clearPreview(message) {
@@ -225,7 +227,7 @@ async function fitWidth() {
   const padding = parseFloat(getComputedStyle(pagesEl).paddingLeft) * 2;
   const available = viewport.clientWidth - padding - 16;   // room for a scrollbar
   fitMode = true;
-  setScale(available / natural);
+  setScale(Math.min(available / natural, fitMax));
 }
 
 function currentPage() {
@@ -264,7 +266,7 @@ pageInput.addEventListener("blur", () => { if (pdfDoc) pageInput.value = String(
 $("zoom-in").addEventListener("click", () => { fitMode = false; setScale(ZOOM_STEPS.find(z => z > scale + 0.001) ?? scale); });
 $("zoom-out").addEventListener("click", () => { fitMode = false; setScale([...ZOOM_STEPS].reverse().find(z => z < scale - 0.001) ?? scale); });
 zoomSelect.addEventListener("change", () => { if (zoomSelect.value !== "fit") { fitMode = false; setScale(parseFloat(zoomSelect.value)); } });
-$("fit-width").addEventListener("click", fitWidth);
+$("fit-width").addEventListener("click", () => { fitMax = Infinity; fitWidth(); });
 let resizeTimer;
 window.addEventListener("resize", () => { if (fitMode) { clearTimeout(resizeTimer); resizeTimer = setTimeout(fitWidth, 150); } });
 

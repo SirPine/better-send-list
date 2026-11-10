@@ -60,7 +60,7 @@ These came from the user; don't undo them without asking.
 
 - **One screen on desktop.** The page fits the window with no page scroll, and only the PDF preview scrolls. Below 900px wide, the cards stack and the page may scroll.
 - **One view:** the upload card on the left and the preview on the right, with an even 24px around and between the cards.
-  - **The preview gets the space:** side margins shrink with the window (`clamp(16px, 4vw, 80px)`) and the upload column flexes from 280 to 380px, so on a ~900px split-screen window the preview stays usable. The preview opens fitted to its width, and in a narrow preview the toolbar stays on one line ("Fit width" becomes icon-only, via a container query).
+  - **The preview gets the space:** side margins shrink with the window (`clamp(16px, 4vw, 80px)`) and the upload column flexes from 280 to 380px, so on a ~900px split-screen window the preview stays usable. The preview opens fitted to its width but **no bigger than 100%** (the user asked to see more of the list; on a wide window full width was ~126%), and the "Fit width" button fills the whole width, and in a narrow preview the toolbar stays on one line ("Fit width" becomes icon-only, via a container query).
 - **Generation starts on upload.** There is no Generate button; a spinner shows in the preview while it runs.
 - **"Need help?" is in the header, on the right.**
 - **Downloads are named `YYYY-MM-DD - Send List.pdf`.**
